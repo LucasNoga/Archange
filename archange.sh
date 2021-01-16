@@ -8,6 +8,10 @@
 # [Usage] : save_nas_history <folder>"
 # ------------------------------------------------------------------
 
+#TODO ameliorer le process de copy :
+# - en supprimant le fichier dans le server
+# - pour cela voir si on ne peut pas faire une commande ssh et scp en meme temps
+
 NAME=ARCHANGE
 VERSION=1.0.0
 
@@ -20,7 +24,8 @@ COLORS=([red]='\033[0;31m'
 typeset -A SERVER=([ip]=''
     [port]=''
     [user]=''
-    [password]='')
+    [password]=''
+    [path]='')
 
 ###
 # Main body of script starts here
@@ -30,6 +35,8 @@ main() {
 
     folder=$(get_folder $1)
     echo -e Folder when you save your history: ${COLORS[yellow]}$(pwd)${COLORS[nc]}
+
+    get_server_path_history
 
     get_password
 
@@ -49,6 +56,7 @@ read_config() {
         PASSWORD=$(eval echo \$$NAME"_PASSWORD")
         IP=$(eval echo \$$NAME"_IP")
         PORT=$(eval echo \$$NAME"_PORT")
+        SERVER_PATH=$(eval echo \$$NAME"_PATH")
 
         # Mapping config
         if [ ! -z $IP ]; then SERVER["ip"]=$IP; else
@@ -63,7 +71,11 @@ read_config() {
             echo -e "${COLORS[red]}ERROR: $NAME"_USER" is not defined into settings.conf .${COLORS[nc]}\nExiting..."
             exit 1
         fi
-        if [ ! -z $PASSWORD ]; then SERVER["password"]=$PASSWORD;
+        if [ ! -z $PASSWORD ]; then
+            SERVER["password"]=$PASSWORD
+        fi
+         if [ ! -z $SERVER_PATH ]; then
+            SERVER["path"]=$SERVER_PATH
         fi
 
     else
@@ -95,13 +107,22 @@ get_password() {
 }
 
 ###
+# Get path on the server to get the history
+###
+get_server_path_history() {
+    if [ -z ${SERVER[path]} ]; then
+        read -p "Type the path you want to get history: " SERVER[path]
+    fi
+    echo -e "You will get the history file of this path: ${COLORS[yellow]} ${SERVER[path]} ${COLORS[nc]}"
+}
+
+###
 # Create ssh connection to server and create a file with all history
 ###
 create_history() {
     echo "Creating SERVER history..."
     echo "Connection to the SERVER..."
-    #TODO mettre en config le repertoire a copier
-    sshpass -p ${SERVER[password]} ssh ${SERVER[user]}@${SERVER[ip]} -p ${SERVER[port]} "cd /volume1 && ls -R NAS/ > HISTORY.txt"
+    sshpass -p ${SERVER[password]} ssh ${SERVER[user]}@${SERVER[ip]} -p ${SERVER[port]} "cd ${SERVER[path]} && ls . -R > HISTORY.txt"
     ret=$?
     if [ $ret -eq 0 ]; then
         echo -e "${COLORS[green]}History created${COLORS[nc]}"
@@ -119,8 +140,7 @@ copy_history_to_local() {
     folder=$1
 
     echo "Connection to the SERVER..."
-    # TODO gerer le nom de sortie
-    sshpass -p ${SERVER[password]} scp -P ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]}:/volume1/HISTORY.txt $folder/NASHISTORY_$(date +"%Y-%m-%d").txt
+    sshpass -p ${SERVER[password]} scp -P ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]}:${SERVER[path]}/HISTORY.txt $folder/HISTORY_$(date +"%Y-%m-%d").txt
     ret=$?
     if [ $ret -eq 0 ]; then
         echo -e "${COLORS[green]}History retrieve${COLORS[nc]}"

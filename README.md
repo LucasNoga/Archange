@@ -27,13 +27,28 @@ $ vim settings.conf`
 then you need to put this on **settings.conf**
 
 ```bash
-IP="XX.XX.XX.XX"
-PORT="XX"
-USER="XXXXX"
-PASSWORD="XXXX"
+ARCHANGE_IP="XX.XX.XX.XX"
+ARCHANGE_PORT="XX"
+ARCHANGE_USER="XXXXXX"
+ARCHANGE_PASSWORD="XXXXXX"
+ARCHANGE_PATH="XXXXXX"
 ```
 
+- ARCHANGE_IP   (mandatory) : Ip of your server
+- ARCHANGE_PORT (mandatory): SSH port of your server
+- ARCHANGE_USER (mandatory): User which has access to the server
+- ARCHANGE_PASSWORD (optional): Password of the user to get access to the server (if you not specified in your config it will be requested later)
+- ARCHANGE_PATH     (optional): Path on your server to get the history files (if you not specified in your config it will be requested later )
 you can complete the **XX** with your server credentials, careful your user needs read and write access
+
+example
+```bash
+ARCHANGE_IP="192.168.1.1"
+ARCHANGE_PORT="21"
+ARCHANGE_USER="toto"
+ARCHANGE_PASSWORD="password"
+ARCHANGE_PATH="/server/dev" # get history files to the folder /server/dev
+```
 
 
 ## How to use
