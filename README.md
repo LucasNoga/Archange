@@ -45,6 +45,9 @@ $ ./archange.sh`
 
 Then follow instructions in your terminal
 
+## Trouble-shootings
+
+If you have any difficulties, problems or enquiries please let me an issue [here](https://github.com/LucasNoga/Archange/issues/new)
 
 ## Credits
 Made by Lucas Noga

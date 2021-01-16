@@ -1,13 +1,14 @@
 #!/bin/bash
 
 # ------------------------------------------------------------------
-# [Author] : Lucas Noga
-# [Title] : Save NAS History
-# [Description] : Save the history of the NAS with ls -R and scp command
+# [Title] : Archange
+# [Description] : Save the history of a server with ls -R and scp command
 # [Version] : 1.0.0
+# [Author] : Lucas Noga
 # [Usage] : save_nas_history <folder>"
 # ------------------------------------------------------------------
 
+NAME=ARCHANGE
 VERSION=1.0.0
 
 typeset -A COLORS
@@ -42,16 +43,29 @@ main() {
 read_config() {
     FILE="./settings.conf"
     if [ -f "$FILE" ]; then
-        source ./settings.conf
+        source "./settings.conf"
+
+        USER=$(eval echo \$$NAME"_USER")
+        PASSWORD=$(eval echo \$$NAME"_PASSWORD")
+        IP=$(eval echo \$$NAME"_IP")
+        PORT=$(eval echo \$$NAME"_PORT")
 
         # Mapping config
-        #TODO a gerer si les valeurs n'existe pas
-        if [ ! -z ${USER+x} ]; then SERVER["user"]=$USER; else echo "pas ok user"; fi
-        if [ ! -z ${PASSWORD+x} ]; then SERVER["password"]=$PASSWORD; else echo "pas ok pass"; fi
-        if [ ! -z ${IP+x} ]; then SERVER["ip"]=$IP; else echo "pas ok ip"; fi
-        if [ ! -z ${PORT+x} ]; then SERVER["port"]=$PORT; else echo "pas ok port"; fi
+        if [ ! -z $IP ]; then SERVER["ip"]=$IP; else
+            echo -e "${COLORS[red]}ERROR: $NAME"_IP" is not defined into settings.conf .${COLORS[nc]}\nExiting..."
+            exit 1
+        fi
+        if [ ! -z $PORT ]; then SERVER["port"]=$PORT; else
+            echo -e "${COLORS[red]}ERROR: $NAME"_PORT" is not defined into settings.conf .${COLORS[nc]}\nExiting..."
+            exit 1
+        fi
+        if [ ! -z $USER ]; then SERVER["user"]=$USER; else
+            echo -e "${COLORS[red]}ERROR: $NAME"_USER" is not defined into settings.conf .${COLORS[nc]}\nExiting..."
+            exit 1
+        fi
+        if [ ! -z $PASSWORD ]; then SERVER["password"]=$PASSWORD;
+        fi
 
-        echo "ALL CONFIG VALUES:" ${SERVER[*]}
     else
         echo -e "${COLORS[red]}ERROR: $FILE doesn't exists.${COLORS[nc]}\nExiting..."
         exit 1
@@ -87,7 +101,6 @@ create_history() {
     echo "Creating SERVER history..."
     echo "Connection to the SERVER..."
     #TODO mettre en config le repertoire a copier
-    # sshpass -p ${NAS[password]} ssh ${NAS[user]}@${NAS[ip]} -p ${NAS[port]} "cd /volume1 && ls -R NAS/ > NASHISTORY.txt"
     sshpass -p ${SERVER[password]} ssh ${SERVER[user]}@${SERVER[ip]} -p ${SERVER[port]} "cd /volume1 && ls -R NAS/ > HISTORY.txt"
     ret=$?
     if [ $ret -eq 0 ]; then
