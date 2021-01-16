@@ -16,8 +16,10 @@ COLORS=([red]='\033[0;31m'
     [yellow]='\033[0;33m'
     [nc]='\033[0m') # No Color
 
-# NAS credentials and endpoint (ip + port) 
-typeset -A NAS
+typeset -A SERVER=([ip]=''
+    [port]=''
+    [user]=''
+    [password]='')
 
 ###
 # Main body of script starts here
@@ -30,8 +32,8 @@ main() {
 
     get_password
 
-    create_nas_history
-    copy_history_local $folder
+    create_history
+    copy_history_to_local $folder
 }
 
 ###
@@ -43,12 +45,13 @@ read_config() {
         source ./settings.conf
 
         # Mapping config
-        if [ ! -z ${NAS_USER+x} ]; then NAS["user"]=$NAS_USER; else echo "pas ok user"; fi
-        if [ ! -z ${NAS_PASSWORD+x} ]; then NAS["password"]=$NAS_PASSWORD; else echo "pas ok pass"; fi
-        if [ ! -z ${NAS_IP+x} ]; then NAS["ip"]=$NAS_IP; else echo "pas ok ip"; fi
-        if [ ! -z ${NAS_PORT+x} ]; then NAS["port"]=$NAS_PORT; else echo "pas ok port"; fi
+        #TODO a gerer si les valeurs n'existe pas
+        if [ ! -z ${USER+x} ]; then SERVER["user"]=$USER; else echo "pas ok user"; fi
+        if [ ! -z ${PASSWORD+x} ]; then SERVER["password"]=$PASSWORD; else echo "pas ok pass"; fi
+        if [ ! -z ${IP+x} ]; then SERVER["ip"]=$IP; else echo "pas ok ip"; fi
+        if [ ! -z ${PORT+x} ]; then SERVER["port"]=$PORT; else echo "pas ok port"; fi
 
-        #echo "ALL CONFIG VALUES:" ${NAS[*]}
+        echo "ALL CONFIG VALUES:" ${SERVER[*]}
     else
         echo -e "${COLORS[red]}ERROR: $FILE doesn't exists.${COLORS[nc]}\nExiting..."
         exit 1
@@ -71,19 +74,21 @@ get_folder() {
 # Read admin password asked if it's not set in config
 ###
 get_password() {
-    if [ -z ${NAS[password]} ]; then
-        read -s -p "Type your nas admin password: " NAS[password]
-        echo 
+    if [ -z ${SERVER[password]} ]; then
+        read -s -p "Type your nas admin password: " SERVER[password]
+        echo
     fi
 }
 
 ###
-# Create ssh connection to nas and create the NASHISTORY.txt file
+# Create ssh connection to server and create a file with all history
 ###
-create_nas_history() {
-    echo "Creating NAS history..."
-    echo "Connection to the NAS..."
-    sshpass -p ${NAS[password]} ssh ${NAS[user]}@${NAS[ip]} -p ${NAS[port]} "cd /volume1 && ls -R NAS/ > NASHISTORY.txt"
+create_history() {
+    echo "Creating SERVER history..."
+    echo "Connection to the SERVER..."
+    #TODO mettre en config le repertoire a copier
+    # sshpass -p ${NAS[password]} ssh ${NAS[user]}@${NAS[ip]} -p ${NAS[port]} "cd /volume1 && ls -R NAS/ > NASHISTORY.txt"
+    sshpass -p ${SERVER[password]} ssh ${SERVER[user]}@${SERVER[ip]} -p ${SERVER[port]} "cd /volume1 && ls -R NAS/ > HISTORY.txt"
     ret=$?
     if [ $ret -eq 0 ]; then
         echo -e "${COLORS[green]}History created${COLORS[nc]}"
@@ -94,14 +99,15 @@ create_nas_history() {
 }
 
 ###
-# Copy history file from nas to local
+# Copy history file from server to local
 ###
-copy_history_local() {
+copy_history_to_local() {
     echo "Copy History in local machine..."
     folder=$1
 
-    echo "Connection to the NAS..."
-    sshpass -p ${NAS[password]} scp -P ${NAS[port]} ${NAS[user]}@${NAS[ip]}:/volume1/NASHISTORY.txt $folder/NASHISTORY_$(date +"%Y-%m-%d").txt
+    echo "Connection to the SERVER..."
+    # TODO gerer le nom de sortie
+    sshpass -p ${SERVER[password]} scp -P ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]}:/volume1/HISTORY.txt $folder/NASHISTORY_$(date +"%Y-%m-%d").txt
     ret=$?
     if [ $ret -eq 0 ]; then
         echo -e "${COLORS[green]}History retrieve${COLORS[nc]}"
