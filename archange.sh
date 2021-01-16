@@ -27,6 +27,12 @@ typeset -A SERVER=([ip]=''
     [password]=''
     [path]='')
 
+# File created on the server
+SERVER_FILE="HISTORY.txt"
+
+# Name of the file which will get the copy (default HISTORY_date)
+FILENAME=HISTORY_$(date +"%Y-%m-%d").txt
+
 ###
 # Main body of script starts here
 ###
@@ -34,11 +40,13 @@ main() {
     read_config
 
     folder=$(get_folder $1)
-    echo -e Folder when you save your history: ${COLORS[yellow]}$(pwd)${COLORS[nc]}
+    echo -e Folder when you save your history: $(color_log "$(pwd)" yellow)
+
+    echo -e Default name is: $(color_log $FILENAME yellow)
 
     get_server_path_history
 
-    get_password
+    get_server_password
 
     create_history
     copy_history_to_local $folder
@@ -60,26 +68,26 @@ read_config() {
 
         # Mapping config
         if [ ! -z $IP ]; then SERVER["ip"]=$IP; else
-            echo -e "${COLORS[red]}ERROR: $NAME"_IP" is not defined into settings.conf .${COLORS[nc]}\nExiting..."
+            echo -e "$(color_log "ERROR: $NAME"_IP" is not defined into settings.conf" red)\nExiting..."
             exit 1
         fi
         if [ ! -z $PORT ]; then SERVER["port"]=$PORT; else
-            echo -e "${COLORS[red]}ERROR: $NAME"_PORT" is not defined into settings.conf .${COLORS[nc]}\nExiting..."
+            echo -e "$(color_log "ERROR: $NAME"_PORT" is not defined into settings.conf" red)\nExiting..."
             exit 1
         fi
         if [ ! -z $USER ]; then SERVER["user"]=$USER; else
-            echo -e "${COLORS[red]}ERROR: $NAME"_USER" is not defined into settings.conf .${COLORS[nc]}\nExiting..."
+            echo -e "$(color_log "ERROR: $NAME"_USER" is not defined into settings.conf" red)\nExiting..."
             exit 1
         fi
         if [ ! -z $PASSWORD ]; then
             SERVER["password"]=$PASSWORD
         fi
-         if [ ! -z $SERVER_PATH ]; then
+        if [ ! -z $SERVER_PATH ]; then
             SERVER["path"]=$SERVER_PATH
         fi
 
     else
-        echo -e "${COLORS[red]}ERROR: $FILE doesn't exists.${COLORS[nc]}\nExiting..."
+        echo -e "$(color_log "ERROR: $FILE doesn't exists." red)\nExiting..."
         exit 1
     fi
 
@@ -97,9 +105,9 @@ get_folder() {
 }
 
 ###
-# Read admin password asked if it's not set in config
+# Read server password asked if it's not set in config
 ###
-get_password() {
+get_server_password() {
     if [ -z ${SERVER[password]} ]; then
         read -s -p "Type your nas admin password: " SERVER[password]
         echo
@@ -113,7 +121,7 @@ get_server_path_history() {
     if [ -z ${SERVER[path]} ]; then
         read -p "Type the path you want to get history: " SERVER[path]
     fi
-    echo -e "You will get the history file of this path: ${COLORS[yellow]} ${SERVER[path]} ${COLORS[nc]}"
+    echo -e "You will get the history file of this path: $(color_log ${SERVER[path]} yellow)"
 }
 
 ###
@@ -122,12 +130,12 @@ get_server_path_history() {
 create_history() {
     echo "Creating SERVER history..."
     echo "Connection to the SERVER..."
-    sshpass -p ${SERVER[password]} ssh ${SERVER[user]}@${SERVER[ip]} -p ${SERVER[port]} "cd ${SERVER[path]} && ls . -R > HISTORY.txt"
+    sshpass -p ${SERVER[password]} ssh ${SERVER[user]}@${SERVER[ip]} -p ${SERVER[port]} "cd ${SERVER[path]} && ls . -R > $SERVER_FILE"
     ret=$?
     if [ $ret -eq 0 ]; then
-        echo -e "${COLORS[green]}History created${COLORS[nc]}"
+        echo -e "$(color_log "History created" green)"
     else
-        echo -e "${COLORS[red]}ERROR: Failed to create history with your credentials.${COLORS[nc]}\nExiting..."
+        echo -e "$(color_log "ERROR: Failed to create history with your credentials." red)\nExiting..."
         exit 1
     fi
 }
@@ -138,16 +146,27 @@ create_history() {
 copy_history_to_local() {
     echo "Copy History in local machine..."
     folder=$1
-
     echo "Connection to the SERVER..."
-    sshpass -p ${SERVER[password]} scp -P ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]}:${SERVER[path]}/HISTORY.txt $folder/HISTORY_$(date +"%Y-%m-%d").txt
+    echo Copy the file $(color_log "${SERVER[ip]}:${SERVER[path]}/$SERVER_FILE" yellow) into $(color_log "$folder/$FILENAME" yellow)
+    sshpass -p ${SERVER[password]} scp -P ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]}:${SERVER[path]}/$SERVER_FILE $folder/$FILENAME
     ret=$?
+
     if [ $ret -eq 0 ]; then
-        echo -e "${COLORS[green]}History retrieve${COLORS[nc]}"
+        echo -e "$(color_log "History retrieve" green)"
+        echo -e History copied: $(color_log "$folder/$FILENAME" yellow)
     else
-        echo -e "${COLORS[red]}ERROR: Failed to retrieve history with your credentials.${COLORS[nc]}\nExiting..."
+        echo -e "$(color_log "ERROR: Failed to retrieve history with your credentials." red)\nExiting..."
         exit 1
     fi
+}
+
+###
+# Log the message in specific color
+###
+color_log() {
+    message=$1
+    color=$2
+    echo -e ${COLORS[$color]}$message${COLORS[nc]}
 }
 
 main $@
