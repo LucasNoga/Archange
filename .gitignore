@@ -1,5 +1,6 @@
-HISTORY*
-Procedure save historique NAS.txt
-
 # config file
 settings.conf
+
+# Private file
+HISTORY*
+Procedure save historique NAS.txt
