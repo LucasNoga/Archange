@@ -3,41 +3,29 @@
 # ------------------------------------------------------------------
 # [Title] : Archange
 # [Description] : Save the history of a server with ls -R and scp command
-# [Version] : v1.0.0
+# [Version] : v1.1.0
 # [Author] : Lucas Noga
-# [Usage] : save_nas_history <folder>"
+# [Usage] : ./archange.sh
+#           ./archange.sh -d
 # ------------------------------------------------------------------
 
-# TODO mettre une constante
-# qui represente le folder HISTORY ou on stocke les fichiers
-# exemple: ./HISTORY/
-
-## TODO changer les options de settings.conf en enlevant ARCHANGE devant chacune d'elle
-
-## creer un fichier settings.sample.conf avec les options par defaut
-## AJOUTER DANS LE README de mv se file en settings.sample.conf
-
-## TODO README modif
-## mettre les differents params comme -d pour debug ou --erase-trace
-## adapter la partic config
-
-## TODO mettre pas mal de log en debug
-
-## TODO TAGGER en v1.1.0 maintenant
-
 PROJECT_NAME=ARCHANGE
-PROJECT_VERSION=v1.0.0
+PROJECT_VERSION=v1.1.0
 
+# Config params to get access to the server
 typeset -A SERVER=(
-    [ip]=''
-    [port]=''
-    [user]=''
-    [password]=''
-    [path]=''
+    [ip]=""       # ip of the server set in config
+    [port]=""     # port of the server set in config
+    [user]=""     # user of the server set in config
+    [password]="" # password of the server set in config
+    [path]=""     # path of the server set in config
 )
 
 # File created on the server
 SERVER_FILE="HISTORY.txt"
+
+# Configuration file
+CONFIG_FILE="./settings.conf"
 
 # Name of the file which will get the copy (default HISTORY_date)
 FILENAME=HISTORY_$(date +"%Y-%m-%d").txt
@@ -53,23 +41,27 @@ typeset -A OPTIONS=(
 # Main body of script starts here
 ###
 main() {
-    read_config
-
     read_options $@
 
-    log_debug "OPTIONS KEY ${!OPTIONS[@]}"
-    log_debug "OPTIONS VALUES ${OPTIONS[@]}"
+    read_config_server $CONFIG_FILE
+
+    log_debug "Server keys: ${!SERVER[@]}"
+    log_debug "Server values: ${SERVER[@]}"
+
+    log_debug "Options keys: ${!OPTIONS[@]}"
+    log_debug "Options values: ${OPTIONS[@]}"
 
     log_debug "Launch Project ${PROJECT_NAME} : ${PROJECT_VERSION}"
 
     folder=$(get_folder)
-    echo -e Folder when you save your history: $(log_color "$(pwd)" yellow)
+    log "Folder when you save your history: $(log_color "$(pwd)" yellow)"
 
-    echo -e Default name is: $(log_color $FILENAME yellow)
+    log "Default name is: $(log_color $FILENAME yellow)"
 
     get_server_path_history
 
-    get_server_password
+    # Ask password if no filled in config
+    read_server_password
 
     create_history
     copy_history_to_local $folder
@@ -81,43 +73,45 @@ main() {
 }
 
 ###
-# Check if config are ok and get variables from settings.file
+# Setup variable from config file
+# $1 = path to the config file (default: ./setting.conf)
 ###
-read_config() {
-    FILE="./settings.conf"
-    if [ -f "$FILE" ]; then
-        source "./settings.conf"
+read_config_server() {
+    CONFIG_FILE=$1
+    log_debug "Read configuration file: $CONFIG_FILE"
 
-        ## TODO a changer avec cette formule OPTIONS+=([debug]=true)
-        ## TODO lire autrement les valeurs probablement dans un array
-        USER=$(eval echo \$$PROJECT_NAME"_USER")
-        PASSWORD=$(eval echo \$$PROJECT_NAME"_PASSWORD")
-        IP=$(eval echo \$$PROJECT_NAME"_IP")
-        PORT=$(eval echo \$$PROJECT_NAME"_PORT")
-        SERVER_PATH=$(eval echo \$$PROJECT_NAME"_PATH")
+    # if configuration file doesn't exists
 
-        # Mapping config
-        if [ ! -z $IP ]; then SERVER["ip"]=$IP; else
-            echo -e "$(log_color "ERROR: $NAME"_IP" is not defined into settings.conf" red)\nExiting..."
-            exit 1
-        fi
-        if [ ! -z $PORT ]; then SERVER["port"]=$PORT; else
-            echo -e "$(log_color "ERROR: $NAME"_PORT" is not defined into settings.conf" red)\nExiting..."
-            exit 1
-        fi
-        if [ ! -z $USER ]; then SERVER["user"]=$USER; else
-            echo -e "$(log_color "ERROR: $NAME"_USER" is not defined into settings.conf" red)\nExiting..."
-            exit 1
-        fi
-        if [ ! -z $PASSWORD ]; then
-            SERVER["password"]=$PASSWORD
-        fi
-        if [ ! -z $SERVER_PATH ]; then
-            SERVER["path"]=$SERVER_PATH
-        fi
+    if [ ! -f "$CONFIG_FILE" ]; then
+        log_color "ERROR: $CONFIG_FILE doesn't exists." "red"
+        log "Exiting..."
+        exit 1
+    fi
 
-    else
-        echo -e "$(log_color "ERROR: $FILE doesn't exists." red)\nExiting..."
+    # Load configuration file
+    source $CONFIG_FILE
+    SERVER+=(
+        [ip]=$(eval echo $IP)
+        [port]=$(eval echo $PORT)
+        [user]=$(eval echo \$$PROJECT_NAME"_USER") # Env variable already defined in the system ($USER) so we prefix it with ARCHANGE_
+        [password]=$(eval echo $PASSWORD)
+        [path]=$(eval echo \$$PROJECT_NAME"_PATH") # Env variable already defined in the system ($PATH) so we prefix it with ARCHANGE_
+    )
+
+    # Check empty values
+    if [ -z ${SERVER[ip]} ]; then
+        log_color "ERROR: IP is not defined into $CONFIG_FILE" "red"
+        log "Exiting..."
+        exit 1
+    fi
+    if [ -z ${SERVER[port]} ]; then
+        log_color "ERROR: PORT is not defined into $CONFIG_FILE" "red"
+        log "Exiting..."
+        exit 1
+    fi
+    if [ -z ${SERVER[user]} ]; then
+        log_color "ERROR: USER is not defined into $CONFIG_FILE" "red"
+        log "Exiting..."
         exit 1
     fi
 }
@@ -169,10 +163,13 @@ handle_erase_trace() {
 ################################################################### Core ###################################################################
 
 ###
-# Get folder to copy file
+# Get folder to copy the file on your local machine and test if it's exist
+# $1: Folder path
+# Return: [string] folder where we copy the file
 ###
 get_folder() {
     folder=$1
+
     if [ -z $folder ] || [ ! -d $folder ]; then
         folder="."
     fi
@@ -182,10 +179,9 @@ get_folder() {
 ###
 # Read server password asked if it's not set in config
 ###
-get_server_password() {
+read_server_password() {
     if [ -z ${SERVER[password]} ]; then
         read -s -p "Type your nas admin password: " SERVER[password]
-        echo
     fi
 }
 
@@ -196,21 +192,22 @@ get_server_path_history() {
     if [ -z ${SERVER[path]} ]; then
         read -p "Type the path you want to get history: " SERVER[path]
     fi
-    echo -e "You will get the history file of this path: $(log_color ${SERVER[path]} yellow)"
+    log "You will get the history file of this path: $(log_color ${SERVER[path]} yellow)"
 }
 
 ###
 # Create ssh connection to server and create a file with all history
 ###
 create_history() {
-    echo "Creating SERVER history..."
-    echo "Connection to the SERVER..."
+    log "Creating SERVER history..."
+    log "Connection to the SERVER..."
     sshpass -p ${SERVER[password]} ssh ${SERVER[user]}@${SERVER[ip]} -p ${SERVER[port]} "cd ${SERVER[path]} && ls . -R > $SERVER_FILE"
     ret=$?
     if [ $ret -eq 0 ]; then
-        echo -e "$(log_color "History created" green)"
+        log_color "History created" "green"
     else
-        echo -e "$(log_color "ERROR: Failed to create history with your credentials." red)\nExiting..."
+        log_color "ERROR: Failed to create history with your credentials." "red"
+        log "Exiting..."
         exit 1
     fi
 }
@@ -219,18 +216,19 @@ create_history() {
 # Copy history file from server to local
 ###
 copy_history_to_local() {
-    echo "Copy History in local machine..."
+    log "Copy History in local machine..."
     folder=$1
-    echo "Connection to the SERVER..."
-    echo Copy the file $(log_color "${SERVER[ip]}:${SERVER[path]}/$SERVER_FILE" yellow) into $(log_color "$folder/$FILENAME" yellow)
+    log "Connection to the SERVER..."
+    log Copy the file $(log_color "${SERVER[ip]}:${SERVER[path]}/$SERVER_FILE" yellow) into $(log_color "$folder/$FILENAME" yellow)
     sshpass -p ${SERVER[password]} scp -P ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]}:${SERVER[path]}/$SERVER_FILE $folder/$FILENAME
     ret=$?
 
     if [ $ret -eq 0 ]; then
-        echo -e "$(log_color "History retrieve" green)"
-        echo -e History copied: $(log_color "$folder/$FILENAME" yellow)
+        log_color "History retrieve" "green"
+        log History copied: $(log_color "$folder/$FILENAME" yellow)
     else
-        echo -e "$(log_color "ERROR: Failed to retrieve history with your credentials." red)\nExiting..."
+        log_color "ERROR: Failed to retrieve history with your credentials." "red"
+        log "Exiting..."
         exit 1
     fi
 }
@@ -240,7 +238,7 @@ copy_history_to_local() {
 # For now removing HISTORY.txt file
 ###
 erase_trace() {
-    echo "Erasing trace..."
+    log "Erasing trace..."
     folder=$1
     filepath=${SERVER[path]}/$SERVER_FILE
 
@@ -249,9 +247,9 @@ erase_trace() {
     ret=$?
 
     if [ $ret -eq 0 ]; then
-        echo -e "$(log_color "Trace erased from server" green)"
+        log_color "Trace erased from remote machine" "green"
     else
-        echo -e "$(log_color "ERROR: Trace not erased from server" red)\nExiting..."
+        log_color "ERROR: Trace not erased from server" "red"
         exit 1
     fi
 }
@@ -261,17 +259,14 @@ erase_trace() {
 ###
 remove_server_file() {
     filepath=$1
-    echo Removing File : $(log_color "$filepath" red)
+    log Removing File : $(log_color "$filepath" red)
 
     # check if file exists
-    # v=$(sshpass -p ${SERVER[password]} ssh -p ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]} -q [[ -f $filepath ]] && echo "File exists" || echo "File does not exist")
     file_exists=$(check_server_file_exists $1)
 
     # if not exists do nothing
     if [ $file_exists -eq 0 ]; then
-        # TODO mettre un log warning genre file doesn't exist anymore
-        echo "File not exists"
-        echo -e $(log_color "File $filepath doesn't exist anymore" blue)
+        log_color "File $filepath doesn't exist anymore" "light_yellow"
         return
     fi
 
@@ -281,19 +276,21 @@ remove_server_file() {
     ret=$?
 
     if [ $ret -eq 0 ]; then
-        echo -e "$(log_color "File $filepath removed" green)"
+        log "File $(log_color $filepath yellow) removed"
     else
-        echo -e "$(log_color "ERROR: Failed to remove your file $filepath" red)\nExiting..."
+        log_color "ERROR: Failed to remove your file $filepath" "red"
+        log "Exiting..."
         exit 1
     fi
 }
 
 ###
 # Check on remote machine if file exists in param $1
-# if return 1 file exists, 0 otherwise
+# $1 : filepath to test
+# Return: [bool] 1 file exists, 0 if not
 ###
 check_server_file_exists() {
-    file=$1
+    filepath=$1
     sshpass -p ${SERVER[password]} ssh -p ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]} -q [[ -f $filepath ]] && echo 1 || echo 0
 }
 
@@ -302,7 +299,6 @@ check_server_file_exists() {
 ###
 # Simple log function to support color
 ###
-# TODO a utiliser au lieu des echo -e
 log() {
     echo -e $@
 }
@@ -335,7 +331,7 @@ typeset -A COLORS=(
 log_color() {
     message=$1
     color=$2
-    echo -e ${COLORS[$color]}$message${COLORS[nc]}
+    log ${COLORS[$color]}$message${COLORS[nc]}
 }
 
 ###
@@ -351,7 +347,7 @@ log_debug() {
 # Return datetime of now (ex: 2022-01-10 23:20:35)
 ###
 get_datetime() {
-    echo $(date '+%Y-%m-%d %H:%M:%S')
+    log $(date '+%Y-%m-%d %H:%M:%S')
 }
 
 main $@

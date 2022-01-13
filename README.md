@@ -2,7 +2,7 @@
 
 Create an history files of your server
 
-#### Version 1.0.0
+#### Version v1.1.0
 
 ## Get Started
 
@@ -23,27 +23,27 @@ $ vim settings.conf
 Put this into the file with your server intels
 
 ```bash
-ARCHANGE_IP="XX.XX.XX.XX"
-ARCHANGE_PORT="XX"
+IP="XX.XX.XX.XX"
+PORT="XX"
 ARCHANGE_USER="XXXXXX"
-ARCHANGE_PASSWORD="XXXXXX"
+PASSWORD="XXXXXX"
 ARCHANGE_PATH="XXXXXX"
 ```
 
-- ARCHANGE_IP (mandatory) : Ip of your server
-- ARCHANGE_PORT (mandatory): SSH port of your server
+- IP (mandatory) : Ip of your server
+- PORT (mandatory): SSH port of your server
 - ARCHANGE_USER (mandatory): User which has access to the server
-- ARCHANGE_PASSWORD (optional): Password of the user to get access to the server (if you not specified in your config it will be requested later)
+- PASSWORD (optional): Password of the user to get access to the server (if you not specified in your config it will be requested later)
 - ARCHANGE_PATH (optional): Path on your server to get the history files (if you not specified in your config it will be requested later )
   you can complete the **XX** with your server credentials, careful your user needs read and write access
 
 Example
 
 ```bash
-ARCHANGE_IP="192.168.1.1"
-ARCHANGE_PORT="21"
+IP="192.168.1.1"
+PORT="21"
 ARCHANGE_USER="toto"
-ARCHANGE_PASSWORD="password"
+PASSWORD="password"
 ARCHANGE_PATH="/server/dev" # get history files to the folder /server/dev
 ```
 
@@ -51,6 +51,7 @@ ARCHANGE_PATH="/server/dev" # get history files to the folder /server/dev
 
 ```bash
 $ chmod +x archange.sh
+$ cp settings.sample.conf settings.conf
 $ ./archange.sh
 ```
 
