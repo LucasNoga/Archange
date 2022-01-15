@@ -15,12 +15,12 @@ PROJECT_VERSION=v1.2.0
 
 # Parameters to execute script
 typeset -A CONFIG=(
-    [config_prefix]=$PROJECT_NAME                      #For settings.conf variable already used in the system ($USER, $PATH)
+    [config_prefix]=$PROJECT_NAME                      # For settings.conf variable already used in the system ($USER, $PATH)
     [config_file]="./settings.conf"                    # Configuration file
     [server_file]="HISTORY.txt"                        # File created on the server to get history
     [folder_history]=""                                # Folder to store on the local machine the history
     [filename_history]=HISTORY-$(date +"%Y-%m-%d").txt # Name of the file which will get the copy (default HISTORY_date)
-    [default_folder_history]="./History1"              # Default Folder to store if no define in settings.conf
+    [default_folder_history]="./History"               # Default Folder to store if no define in settings.conf
 )
 
 # Parameters to get access to the remote machine
@@ -34,6 +34,7 @@ typeset -A SERVER=(
 
 # Options params setup with command parameters
 typeset -A OPTIONS=(
+    [run]=true          # if run is to false we don't execute the script
     [debug]=false       # Debug mode to show more log
     [debug_color]=blue  # Color to show log in debug mode
     [erase_trace]=false # if true we erase trace on the remote machine
@@ -43,34 +44,16 @@ typeset -A OPTIONS=(
 # Main body of script starts here
 ###
 main() {
-    read_options $@
-
-    log_debug "Options keys: ${!OPTIONS[@]}"
-    log_debug "Options values: ${OPTIONS[@]}"
-
-    read_config ${CONFIG[config_file]}
-
-    log_debug "Config keys: ${!CONFIG[@]}"
-    log_debug "Config values: ${CONFIG[@]}"
-    log_debug "Server keys: ${!SERVER[@]}"
-    log_debug "Server values: ${SERVER[@]}"
-
     log_debug "Launch Project ${PROJECT_NAME} : ${PROJECT_VERSION}"
 
-    setup_folder_history ${CONFIG[folder_history]}
+    # Read script options like (--debug)
+    read_options $@
 
-    get_server_path_history
+    # Read .conf file (default ./setting.conf)
+    read_config ${CONFIG[config_file]}
 
-    # Ask password if no filled in config
-    read_server_password
-
-    create_history
-    copy_history_to_local
-
-    # Remove file(s) from servers if option is activated
-    if [ "${OPTIONS[erase_trace]}" = true ]; then
-        erase_trace
-    fi
+    # Create the file to kept data history of your server
+    launch_history
 }
 
 ###
@@ -101,6 +84,10 @@ read_config() {
         log "No folder define get default value of folder: $(log_color "${CONFIG[default_folder_history]}" "yellow")"
     fi
 
+    log_debug "Config keys: ${!CONFIG[@]}"
+    log_debug "Config values: ${CONFIG[@]}"
+    log_debug "Server keys: ${!SERVER[@]}"
+    log_debug "Server values: ${SERVER[@]}"
 }
 
 ###
@@ -146,22 +133,27 @@ read_config_server() {
 read_options() {
     params=("$@") # Convert params into an array
 
-    # Step through all param passed
+    # Step through all params passed to the script
     for param in "${params[@]}"; do
+        log_debug "Option '$param' founded"
         case $param in
-        "-d")
-            active_debug_mode
-            ;;
-        "--debug")
+        "-d" | "--debug")
             active_debug_mode
             ;;
         "--erase-trace")
             handle_erase_trace
             ;;
+        "-c" | "--config" | "--show-config")
+            show_settings
+            OPTIONS+=([run]=false)
+            ;;
         *) ;;
         esac
-        log_debug "Option '$param' founded"
     done
+
+    log_debug "Options keys: ${!OPTIONS[@]}"
+    log_debug "Options values: ${OPTIONS[@]}"
+
 }
 
 ###
@@ -180,7 +172,54 @@ handle_erase_trace() {
     log_debug "Erase Trace active" $DEBUG_COLOR
 }
 
+###
+# List settings in settings.conf file if they are defined
+# $1: path where the settings file is (default: "./settings.conf")
+###
+show_settings() {
+    file=$1
+    # get default configuration file if no filled
+    if [ -z $file ]; then
+        file=${CONFIG[config_file]}
+    fi
+
+    read_config $file
+
+    log "Here's your settings: "
+    log "\t- Ip:" $(log_color "${SERVER[ip]}" "yellow")
+    log "\t- Port:" $(log_color "${SERVER[port]}" "yellow")
+    log "\t- User:" $(log_color "${SERVER[user]}" "yellow")
+    log "\t- Password:" $(log_color "${SERVER[password]}" "yellow")
+    log "\t- Path:" $(log_color "${SERVER[path]}" "yellow")
+    log "\t- File where the history is saved:" $(log_color "${CONFIG[folder_history]}/${CONFIG[filename_history]}" "yellow")
+}
+
 ################################################################### Core ###################################################################
+
+###
+# Main method to run history
+###
+launch_history() {
+    if [ "${OPTIONS[run]}" = false ]; then
+        log_debug "No run history because option block it"
+        return
+    fi
+
+    setup_folder_history ${CONFIG[folder_history]}
+
+    get_server_path_history
+
+    # Ask password if no filled in config
+    read_server_password
+
+    create_history
+    copy_history_to_local
+
+    # Remove file(s) from servers if option is activated
+    if [ "${OPTIONS[erase_trace]}" = true ]; then
+        erase_trace
+    fi
+}
 
 ###
 # Create History folder if it doesn't created yet

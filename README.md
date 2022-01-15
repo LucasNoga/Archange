@@ -78,8 +78,15 @@ $ ./archange.sh --debug
 $ ./archange.sh -d
 ```
 
+Show configuration data with your file
+
+```bash
+$ ./archange.sh -c
+$ ./archange.sh --config
+$ ./archange.sh --show-config
+```
+
 Erase trace on the server
-Display debug mode
 
 ```bash
 $ ./archange.sh --trace-erase
@@ -87,7 +94,7 @@ $ ./archange.sh --trace-erase
 
 ## Export configuration of DSM
 
-- Go to your Synology access then Panel Configuration > Configuration Backup
+- Go to your NAS Synology then go to `Panel Configuration` > `Configuration Backup`
 - Click to `Export`
 
 ## Manual Process
