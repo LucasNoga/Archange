@@ -44,7 +44,7 @@ typeset -A SERVER=(
 ###
 # Main body of script starts here
 ###
-main() {
+function main {
     read_options $@ # Read script options like (--debug)
     log_debug "Launch Project $(log_color "${PROJECT_NAME} : ${PROJECT_VERSION}" "magenta")"
 
@@ -59,7 +59,7 @@ main() {
 # Setup variables from config file
 # $1 = path to the config file (default: ./setting.conf)
 ###
-read_config() {
+function read_config {
     configuration_file=$1
     log_debug "Read configuration file: $configuration_file"
 
@@ -91,7 +91,7 @@ read_config() {
 # Setup remote machine (user, password, ip, port) from config file
 # $1 = path to the config file (default: ./setting.conf)
 ###
-read_config_server() {
+function read_config_server {
     configuration_file=$1
 
     SERVER+=(
@@ -127,7 +127,7 @@ read_config_server() {
 # -d | --debug : Setup debug mode
 # --erase-trace : Erase file and your trace on remote machine
 ###
-read_options() {
+function read_options {
     params=("$@") # Convert params into an array
 
     # Step through all params passed to the script
@@ -158,7 +158,7 @@ read_options() {
 ###
 # Active the debug mode changing options params
 ###
-active_debug_mode() {
+function active_debug_mode {
     OPTIONS+=([debug]=true)
     log_debug "Debug Mode Activated"
 }
@@ -166,7 +166,7 @@ active_debug_mode() {
 ###
 # Check if erase trace is asked in parameter
 ###
-handle_erase_trace() {
+function handle_erase_trace {
     OPTIONS+=([erase_trace]=true)
     log_debug "Erase Trace active"
 }
@@ -175,7 +175,7 @@ handle_erase_trace() {
 # List settings in settings.conf file if they are defined
 # $1: path where the settings file is (default: "./settings.conf")
 ###
-show_settings() {
+function show_settings {
     file=$1
     # get default configuration file if no filled
     if [ -z $file ]; then
@@ -197,7 +197,7 @@ show_settings() {
 # Setup the settings in command line for the user, if the file exists we erased it
 # $1: path where the settings file is (default: "./settings.conf")
 ###
-setup_settings() {
+function setup_settings {
     file=$1
     log "Setup settings need some intels to create your settings"
     # get default configuration file if no filled
@@ -260,7 +260,7 @@ setup_settings() {
 # $1: [string] path where the settings file is (default: "./settings.conf")
 # $2: [array] data to insert into the setting like (ip, user of else)
 ###
-write_settings_file() {
+function write_settings_file {
     file=$1
     eval "declare -A DATA="${2#*=} # eval string into a new associative array
 
@@ -288,7 +288,7 @@ write_settings_file() {
 ###
 # Main method to run history
 ###
-launch_history() {
+function launch_history {
     if [ "${CONFIG[run]}" = false ]; then
         log_debug "No run history because some options block it"
         return
@@ -314,7 +314,7 @@ launch_history() {
 # Create History folder if it doesn't created yet
 # $1: Folder History path from config
 ###
-setup_folder_history() {
+function setup_folder_history {
     folder=$1
     if [ -d $folder ]; then
         log_debug "Folder $folder already exists. No need to create it."
@@ -330,7 +330,7 @@ setup_folder_history() {
 # $1: Folder path
 # Return: [string] folder where we copy the file
 ###
-get_folder() {
+function get_folder {
     folder=$1
     if [ -z $folder ] || [ ! -d $folder ]; then
         folder="."
@@ -341,7 +341,7 @@ get_folder() {
 ###
 # Read server password asked if it's not set in config
 ###
-read_server_password() {
+function read_server_password {
     if [ -z ${SERVER[password]} ]; then
         read -s -p "Type your nas admin password: " SERVER[password]
     fi
@@ -350,7 +350,7 @@ read_server_password() {
 ###
 # Get path on the server to get the history
 ###
-get_server_path_history() {
+function get_server_path_history {
     if [ -z ${SERVER[path]} ]; then
         read -p "Type the path you want to get history: " SERVER[path]
     fi
@@ -360,7 +360,7 @@ get_server_path_history() {
 ###
 # Create ssh connection to server and create a file with all history
 ###
-create_history() {
+function create_history {
     log_debug "Creating SERVER history..."
     log_debug "Connection to the SERVER..."
     sshpass -p ${SERVER[password]} ssh ${SERVER[user]}@${SERVER[ip]} -p ${SERVER[port]} "cd ${SERVER[path]} && ls . -R > ${CONFIG[server_file]}"
@@ -377,7 +377,7 @@ create_history() {
 ###
 # Copy history file from server to local
 ###
-copy_history_to_local() {
+function copy_history_to_local {
     folder=${CONFIG[folder_history]}
     log_debug "Copy History in local machine...\nConnection to the SERVER..."
     server_path=${SERVER[ip]}:${SERVER[path]}/${CONFIG[server_file]}
@@ -402,7 +402,7 @@ copy_history_to_local() {
 # Remove trace of your pass on the server
 # For now removing HISTORY.txt file
 ###
-erase_trace() {
+function erase_trace {
     log_debug "Erasing trace..."
     folder=$1
     filepath=${SERVER[path]}/${CONFIG[server_file]}
@@ -422,7 +422,7 @@ erase_trace() {
 ###
 # Remove on remote machine file in filepath in param $1
 ###
-remove_server_file() {
+function remove_server_file {
     filepath=$1
     log_debug "Removing File in the server : $(log_color "$filepath" red)"
 
@@ -454,7 +454,7 @@ remove_server_file() {
 # $1 : filepath to test
 # Return: [bool] 1 file exists, 0 if not
 ###
-check_server_file_exists() {
+function check_server_file_exists {
     filepath=$1
     sshpass -p ${SERVER[password]} ssh -p ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]} -q [[ -f $filepath ]] && echo 1 || echo 0
 }
@@ -464,7 +464,7 @@ check_server_file_exists() {
 ###
 # Return datetime of now (ex: 2022-01-10 23:20:35)
 ###
-get_datetime() {
+function get_datetime {
     log $(date '+%Y-%m-%d %H:%M:%S')
 }
 
@@ -472,7 +472,7 @@ get_datetime() {
 # Ask yes/no question for user and return boolean
 # $1 : question to prompt for the user
 ###
-ask_yes_no() {
+function ask_yes_no {
     message=$1
     read -r -p "$message [y/N] : " ask
     if [ "$ask" == 'y' ] || [ "$ask" == 'Y' ]; then
@@ -488,7 +488,7 @@ ask_yes_no() {
 # $2: [string] type of data wanted (text, number, password)
 # $3: [integer] number of character wanted at least
 ###
-read_data() {
+function read_data {
     message=$1
     type=$2
     min_char=$3
@@ -529,7 +529,7 @@ function print_array {
 ###
 # Simple log function to support color
 ###
-log() {
+function log {
     echo -e $@
 }
 
@@ -558,7 +558,7 @@ typeset -A COLORS=(
 ###
 # Log the message in specific color
 ###
-log_color() {
+function log_color {
     message=$1
     color=$2
     log ${COLORS[$color]}$message${COLORS[nc]}
@@ -567,7 +567,7 @@ log_color() {
 ###
 # Log the message if debug mode is activated
 ###
-log_debug() {
+function log_debug {
     message=$@
     date=$(get_datetime)
     if [ "${OPTIONS[debug]}" = true ]; then log_color "[$date] $message" ${CONFIG[debug_color]}; fi
