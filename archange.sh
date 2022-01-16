@@ -363,6 +363,18 @@ function get_server_path_history {
 function create_history {
     log_debug "Creating SERVER history..."
     log_debug "Connection to the SERVER..."
+
+    # Check if folder exists
+    folder_exists=$(check_server_folder_exists ${SERVER[path]})
+    # if not exists exit program
+    if [ $folder_exists -eq 0 ]; then
+        log "Please change $(log_color "${CONFIG[config_prefix]}_PATH" "yellow") in $(log_color "${CONFIG[config_file]}" "yellow")"
+        log "$(log_color "Because folder" "red") $(log_color "${SERVER[path]}" "magenta") $(log_color "doesn't exist in remote machine" "red")"
+        exit 1
+    else
+        log_debug "Can create history from ${SERVER[path]} because it does exist"
+    fi
+
     sshpass -p ${SERVER[password]} ssh ${SERVER[user]}@${SERVER[ip]} -p ${SERVER[port]} "cd ${SERVER[path]} && ls . -R > ${CONFIG[server_file]}"
     ret=$?
     # if something's wrong
@@ -380,6 +392,7 @@ function create_history {
 function copy_history_to_local {
     folder=${CONFIG[folder_history]}
     log_debug "Copy History in local machine...\nConnection to the SERVER..."
+
     server_path=${SERVER[ip]}:${SERVER[path]}/${CONFIG[server_file]}
     local_path=$folder/${CONFIG[filename_history]}
     log "Copy the file from $(log_color "$server_path" yellow) to $(log_color "$local_path" yellow)"
@@ -450,8 +463,18 @@ function remove_server_file {
 }
 
 ###
+# Check on remote machine if folder exists in param $1
+# $1 : [string] folder path to test
+# Return: [bool] 1 file exists, 0 if not
+###
+function check_server_folder_exists {
+    folder_path=$1
+    sshpass -p ${SERVER[password]} ssh -p ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]} -q [[ -d $folder_path ]] && echo 1 || echo 0
+}
+
+###
 # Check on remote machine if file exists in param $1
-# $1 : filepath to test
+# $1 : [string] file path to test
 # Return: [bool] 1 file exists, 0 if not
 ###
 function check_server_file_exists {
