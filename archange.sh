@@ -3,24 +3,33 @@
 # ------------------------------------------------------------------
 # [Title] : Archange
 # [Description] : Save the history of a server
-# [Version] : v1.2.0
+# [Version] : v1.3.0
 # [Author] : Lucas Noga
 # [Shell] : Bash v5.0.17
 # [Usage] : ./archange.sh
-#           ./archange.sh -d
+#           ./archange.sh --debug
+#           ./archange.sh --debug --setup
 # ------------------------------------------------------------------
 
 PROJECT_NAME=ARCHANGE
-PROJECT_VERSION=v1.2.0
+PROJECT_VERSION=v1.3.0
 
 # Parameters to execute script
 typeset -A CONFIG=(
+    [run]=true                                         # If run is to false we don't execute the script
     [config_prefix]=$PROJECT_NAME                      # For settings.conf variable already used in the system ($USER, $PATH)
     [config_file]="./settings.conf"                    # Configuration file
     [server_file]="HISTORY.txt"                        # File created on the server to get history
     [folder_history]=""                                # Folder to store on the local machine the history
     [filename_history]=HISTORY-$(date +"%Y-%m-%d").txt # Name of the file which will get the copy (default HISTORY_date)
     [default_folder_history]="./History"               # Default Folder to store if no define in settings.conf
+    [debug_color]=light_blue                           # Color to show log in debug mode
+)
+
+# Options params setup with command parameters
+typeset -A OPTIONS=(
+    [debug]=false       # Debug mode to show more log
+    [erase_trace]=false # if true we erase trace on the remote machine
 )
 
 # Parameters to get access to the remote machine
@@ -32,22 +41,12 @@ typeset -A SERVER=(
     [path]=""     # path of the server set in config
 )
 
-# Options params setup with command parameters
-typeset -A OPTIONS=(
-    [run]=true          # if run is to false we don't execute the script
-    [debug]=false       # Debug mode to show more log
-    [debug_color]=blue  # Color to show log in debug mode
-    [erase_trace]=false # if true we erase trace on the remote machine
-)
-
 ###
 # Main body of script starts here
 ###
 main() {
-    log_debug "Launch Project ${PROJECT_NAME} : ${PROJECT_VERSION}"
-
-    # Read script options like (--debug)
-    read_options $@
+    read_options $@ # Read script options like (--debug)
+    log_debug "Launch Project $(log_color "${PROJECT_NAME} : ${PROJECT_VERSION}" "magenta")"
 
     # Read .conf file (default ./setting.conf)
     read_config ${CONFIG[config_file]}
@@ -84,10 +83,8 @@ read_config() {
         log "No folder define get default value of folder: $(log_color "${CONFIG[default_folder_history]}" "yellow")"
     fi
 
-    log_debug "Config keys: ${!CONFIG[@]}"
-    log_debug "Config values: ${CONFIG[@]}"
-    log_debug "Server keys: ${!SERVER[@]}"
-    log_debug "Server values: ${SERVER[@]}"
+    log_debug "Dump: $(declare -p CONFIG)"
+    log_debug "Dump: $(declare -p SERVER)"
 }
 
 ###
@@ -145,15 +142,17 @@ read_options() {
             ;;
         "-c" | "--config" | "--show-config")
             show_settings
-            OPTIONS+=([run]=false)
+            CONFIG+=([run]=false) # Only display config do not execute the history
+            ;;
+        "-s" | "--setup" | "--setup-config")
+            setup_settings
+            CONFIG+=([run]=false) # Only display config do not execute the history
             ;;
         *) ;;
         esac
     done
 
-    log_debug "Options keys: ${!OPTIONS[@]}"
-    log_debug "Options values: ${OPTIONS[@]}"
-
+    log_debug "Dump: $(declare -p OPTIONS)"
 }
 
 ###
@@ -169,7 +168,7 @@ active_debug_mode() {
 ###
 handle_erase_trace() {
     OPTIONS+=([erase_trace]=true)
-    log_debug "Erase Trace active" $DEBUG_COLOR
+    log_debug "Erase Trace active"
 }
 
 ###
@@ -194,14 +193,104 @@ show_settings() {
     log "\t- File where the history is saved:" $(log_color "${CONFIG[folder_history]}/${CONFIG[filename_history]}" "yellow")
 }
 
+###
+# Setup the settings in command line for the user, if the file exists we erased it
+# $1: path where the settings file is (default: "./settings.conf")
+###
+setup_settings() {
+    file=$1
+    log "Setup settings need some intels to create your settings"
+    # get default configuration file if no filled
+    if [ -z $file ]; then
+        file=${CONFIG[config_file]}
+    fi
+
+    # Check if you want to override the file
+    if [ -f $file ]; then
+        override=$(ask_yes_no "$(log_color "$file" "yellow") already exists do you want to override it")
+        if [ "$override" == false ]; then
+            log_color "Abort settings editing - no override" "red"
+            exit 0
+        fi
+    fi
+
+    # Read value for the user
+    ip=$(read_data "Ip of remote machine (default: 192.168.0.1)" "number" 1)
+    port=$(read_data "Port of remote machine (default: 22)" "number" 1)
+    path=$(read_data "Path of remote machine to save history on your machine (default: /mnt/disk)" "text" 1)
+    user=$(read_data "User of remote machine (default: root)" "text" 1)
+    folder=$(read_data "Folder local when you want to save your history (default: "./History")" "text" 1)
+    password=$(read_data "Password of remote machine (default: \"\")" "password")
+
+    typeset -A INPUTS+=(
+        [IP]="$ip"
+        [PORT]="$port"
+        [USER]="$user"
+        [PASSWORD]="$password"
+        [PATH]="$path"
+        [FOLDER_HISTORY]="$folder"
+    )
+
+    log_debug "Dump: $(declare -p INPUTS)"
+
+    echo "\n"
+    for data in "${!INPUTS[@]}"; do
+        if [ $data == "PASSWORD" ]; then
+            log_debug "$data -> ${INPUTS[$data]}"
+        else
+            log_color "$data -> ${INPUTS[$data]}" "light_blue"
+        fi
+    done
+
+    confirmation=$(ask_yes_no "$(log_color "Do you want to apply this settings ?" "yellow")")
+    if [ "$confirmation" == false ]; then
+        log_color "Abort settings editing - no confirmation data" "red"
+        exit 0
+    fi
+
+    # Write the settings
+    write_settings_file $file "$(declare -p INPUTS)"
+
+    # show the new settings
+    show_settings $file
+}
+
+###
+# Write the file settings the settings in command line for the user, if the file exists we erased it
+# $1: [string] path where the settings file is (default: "./settings.conf")
+# $2: [array] data to insert into the setting like (ip, user of else)
+###
+write_settings_file() {
+    file=$1
+    eval "declare -A DATA="${2#*=} # eval string into a new associative array
+
+    # if file doesn't exist we create it
+    if [ ! -f $file ]; then
+        log_debug "Creating $(log_color "$file" "yellow")"
+        touch $file
+        log_debug "$(log_color "$file" "yellow") Created"
+    else
+        log_debug "Resetting old settings in $(log_color "$file" "yellow")"
+        >$file # Resetting file
+        log_debug "$(log_color "$file" "yellow") Reseted"
+    fi
+
+    echo "IP=${DATA[IP]}" >>$file
+    echo "PORT=${DATA[PORT]}" >>$file
+    echo "ARCHANGE_USER=${DATA[USER]}" >>$file
+    echo "PASSWORD=${DATA[PASSWORD]}" >>$file
+    echo "ARCHANGE_PATH=${DATA[PATH]}" >>$file
+    echo "FOLDER_HISTORY=${DATA[FOLDER_HISTORY]}" >>$file
+}
+
 ################################################################### Core ###################################################################
 
 ###
 # Main method to run history
 ###
 launch_history() {
-    if [ "${OPTIONS[run]}" = false ]; then
-        log_debug "No run history because option block it"
+    if [ "${CONFIG[run]}" = false ]; then
+        log_debug "No run history because some options block it"
         return
     fi
 
@@ -278,7 +367,7 @@ create_history() {
     ret=$?
     # if something's wrong
     if [ ! $ret -eq 0 ]; then
-        log_color "ERROR: Failed to create history with your credentials." "red"
+        log_color "ERROR: Failed to create history with your params." "red"
         log "Exiting..."
         exit 1
     fi
@@ -370,6 +459,71 @@ check_server_file_exists() {
     sshpass -p ${SERVER[password]} ssh -p ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]} -q [[ -f $filepath ]] && echo 1 || echo 0
 }
 
+################################################################### Utils functions ###################################################################
+
+###
+# Return datetime of now (ex: 2022-01-10 23:20:35)
+###
+get_datetime() {
+    log $(date '+%Y-%m-%d %H:%M:%S')
+}
+
+###
+# Ask yes/no question for user and return boolean
+# $1 : question to prompt for the user
+###
+ask_yes_no() {
+    message=$1
+    read -r -p "$message [y/N] : " ask
+    if [ "$ask" == 'y' ] || [ "$ask" == 'Y' ]; then
+        echo true
+    else
+        echo false
+    fi
+}
+
+###
+# Setup a read value for a user, and return it
+# $1: [string] message prompt for the user
+# $2: [string] type of data wanted (text, number, password)
+# $3: [integer] number of character wanted at least
+###
+read_data() {
+    message=$1
+    type=$2
+    min_char=$3
+
+    if [ -z $min_char ]; then min_char=0; fi
+
+    read_options=""
+    case $type in
+    "text")
+        read_options="-r"
+        ;;
+    "number")
+        read_options="-r"
+        ;;
+    "password")
+        read_options="-rs"
+        ;;
+    *) ;;
+    esac
+
+    # read command value
+    read $read_options -p "$message : " value
+
+    echo $value
+}
+
+###
+# Remember to pass an array as param into a function (pass it in param with $(declare -p array))
+# $1 : [Array] associative array to reuse
+###
+function print_array {
+    eval "declare -A func_assoc_array="${1#*=} # eval string into a new associative array
+    declare -p func_assoc_array                # proof that array was successfully created
+}
+
 ################################################################### Logging functions ###################################################################
 
 ###
@@ -398,8 +552,8 @@ typeset -A COLORS=(
     [light_blue]='\033[0;94m'
     [light_magenta]='\033[0;95m'
     [light_cyan]='\033[0;96m'
-    [nc]='\033[0m'
-) # No Color
+    [nc]='\033[0m' # No Color
+)
 
 ###
 # Log the message in specific color
@@ -416,14 +570,7 @@ log_color() {
 log_debug() {
     message=$@
     date=$(get_datetime)
-    if [ "${OPTIONS[debug]}" = true ]; then log_color "[$date] $message" ${OPTIONS[debug_color]}; fi
-}
-
-###
-# Return datetime of now (ex: 2022-01-10 23:20:35)
-###
-get_datetime() {
-    log $(date '+%Y-%m-%d %H:%M:%S')
+    if [ "${OPTIONS[debug]}" = true ]; then log_color "[$date] $message" ${CONFIG[debug_color]}; fi
 }
 
 main $@

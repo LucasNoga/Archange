@@ -11,7 +11,7 @@ Developped in Bash v5.0.17
 - [Trouble-shootings](#trouble-shootings)
 - [Credits](#credits)
 
-#### Version v1.2.0
+#### Version v1.3.0
 
 ## Get Started
 
@@ -86,6 +86,14 @@ $ ./archange.sh --config
 $ ./archange.sh --show-config
 ```
 
+Setup configuration file
+
+```bash
+$ ./archange.sh -s
+$ ./archange.sh --setup
+$ ./archange.sh --setup-config
+```
+
 Erase trace on the server
 
 ```bash
@@ -99,8 +107,10 @@ $ ./archange.sh --trace-erase
 
 ## Manual Process
 
-- Create a file in your server with `ls -R` command in choosen repository
-- Copy in your local machine it choosen folder with `scp` this file
+- Connect to your remote machine with ssh command `ssh <USER>@<IP> -p <PORT>`
+- Go to your folder when you want to get history
+- Create a file in your server with `ls -R . > HISTORY.txt` command in choosen repository
+- Copy in your local machine it choosen folder with `scp -p <PORT> <USER>@<IP>:/PATH/.../HISTORY.txt HISTORY-$(date +"%Y-%m-%d").txt` this file
 
 ## Trouble-shootings
 
