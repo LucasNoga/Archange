@@ -11,7 +11,7 @@ Developped in Bash v5.0.17
 - [Trouble-shootings](#trouble-shootings)
 - [Credits](#credits)
 
-#### Version v1.3.0
+#### Version v1.4.0
 
 ## Get Started
 
