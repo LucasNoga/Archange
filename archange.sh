@@ -141,7 +141,8 @@ function read_options {
         log_debug "Option '$param' founded"
         case $param in
         "--erase-trace")
-            handle_erase_trace
+            log_debug "Erase Trace active"
+            set_option "erase_trace" "true"
             ;;
         "-c" | "--config" | "--show-config")
             show_settings
@@ -166,17 +167,19 @@ function active_debug_mode {
         log_debug "Debug Mode already activated"
         return
     fi
-    OPTIONS+=([debug]=true)
+    set_option "debug" "true"
     log_debug "Debug Mode Activated"
 }
 
 ###
-# Check if erase trace is asked in parameter
+# Set value to the OPTIONS array 
+# $1 : [string] key to update
+# $2 : [string] value to set
 ###
-function handle_erase_trace {
-    OPTIONS+=([erase_trace]=true)
-    log_debug "Erase Trace active"
+function set_option {
+    OPTIONS+=([$1]=$2)
 }
+
 
 ###
 # List settings in settings.conf file if they are defined

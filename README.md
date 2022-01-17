@@ -18,7 +18,7 @@ Developped in Bash v5.0.17
 You need to create a file call setting.conf in the repo like this
 
 ```bash
-$ git clone https://github.com/LucasNoga/archange.git
+$ git clone https://github.com/LucasNoga/Archange.git
 $ cd archange
 ```
 
