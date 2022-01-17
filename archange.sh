@@ -130,13 +130,15 @@ function read_config_server {
 function read_options {
     params=("$@") # Convert params into an array
 
+    # Check if debug exists between all parametters
+    for param in "${params[@]}"; do
+        [[ $param == "-d" ]] || [[ $param == "--debug" ]] && active_debug_mode
+    done
+
     # Step through all params passed to the script
     for param in "${params[@]}"; do
         log_debug "Option '$param' founded"
         case $param in
-        "-d" | "--debug")
-            active_debug_mode
-            ;;
         "--erase-trace")
             handle_erase_trace
             ;;
@@ -156,9 +158,13 @@ function read_options {
 }
 
 ###
-# Active the debug mode changing options params
+# Active the debug mode by changing options params
 ###
 function active_debug_mode {
+    if [ ${OPTIONS[debug]} == true ]; then
+        log_debug "Debug Mode already activated"
+        return
+    fi
     OPTIONS+=([debug]=true)
     log_debug "Debug Mode Activated"
 }
