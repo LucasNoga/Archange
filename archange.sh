@@ -214,13 +214,25 @@ function setup_settings {
         fi
     fi
 
+    # DEFAULT VALUES
+    typeset -A DEFAULT_VALUES=(
+        [IP]="192.168.0.1"
+        [PORT]="22"
+        [USER]="root"
+        [PASSWORD]="root_password"
+        [PATH]="/mnt/disk"
+        [FOLDER_HISTORY]="./History"
+    )
+
+    log_debug "Dump: $(declare -p DEFAULT_VALUES)"
+
     # Read value for the user
-    ip=$(read_data "Ip of remote machine (default: 192.168.0.1)" "number" 1)
-    port=$(read_data "Port of remote machine (default: 22)" "number" 1)
-    path=$(read_data "Path of remote machine to save history on your machine (default: /mnt/disk)" "text" 1)
-    user=$(read_data "User of remote machine (default: root)" "text" 1)
-    folder=$(read_data "Folder local when you want to save your history (default: "./History")" "text" 1)
-    password=$(read_data "Password of remote machine (default: \"\")" "password")
+    ip=$(read_data "Ip of remote machine (default: $(log_color ${DEFAULT_VALUES[IP]} yellow))" "number")
+    port=$(read_data "Port of remote machine (default: $(log_color ${DEFAULT_VALUES[PORT]} yellow))" "number")
+    path=$(read_data "Path of remote machine to save history on your machine (default: $(log_color ${DEFAULT_VALUES[PATH]} yellow))" "text")
+    user=$(read_data "User of remote machine (default: $(log_color ${DEFAULT_VALUES[USER]} yellow))" "text" 1)
+    folder=$(read_data "Folder local when you want to save your history (default: $(log_color ${DEFAULT_VALUES[FOLDER_HISTORY]} yellow))" "text")
+    password=$(read_data "Password of remote machine (default: $(log_color ${DEFAULT_VALUES[PASSWORD]} yellow))" "password")
 
     typeset -A INPUTS+=(
         [IP]="$ip"
@@ -230,6 +242,9 @@ function setup_settings {
         [PATH]="$path"
         [FOLDER_HISTORY]="$folder"
     )
+
+    # Check all the inputs
+    check_inputs DEFAULT_VALUES INPUTS
 
     log_debug "Dump: $(declare -p INPUTS)"
 
@@ -253,6 +268,66 @@ function setup_settings {
 
     # show the new settings
     show_settings $file
+}
+
+###
+# Check data filled by user and process it by replacing by default value if conditions are not satisfied
+# $1 : [Assoc-Array] default values set before
+# $2 : [Assoc-Array] inputs values from user
+# return [Assoc-Array] new inputs value
+###
+function check_inputs {
+    declare -n DEFAULTS="$1" # Get Reference of variable DEFAULTS_VALUE before to not get a copie
+    declare -n DATA=$2       # Get Reference of variable INPUTS before to not get a copie
+
+    for key in "${!DATA[@]}"; do
+        val=${DATA[$key]}
+        count=${#val}
+        case $key in
+        "IP")
+            min_char=1
+            regex="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+            ;;
+        "PORT")
+            min_char=1
+            regex="^[0-9]{0,5}$"
+            ;;
+        "USER" | "PATH" | "PORT" | "FOLDER_HISTORY")
+            min_char=1
+            regex=""
+            ;;
+        "PASSWORD")
+            min_char=0
+            regex=""
+            ;;
+        *)
+            min_char=1 # Default character to check
+            regex=""
+            ;;
+        esac
+
+        # Do the check on char number
+        # if no values
+        if [ $count -eq 0 ]; then
+            log_debug "Setting default value for $key: ${DEFAULTS[$key]}"
+            DATA+=([$key]=${DEFAULTS[$key]})
+        # if less than expected
+        elif [ $count -lt $min_char ]; then
+            log_color "Incorrect value for $key you need $min_char characters at least. You have only $count ($val)" "red"
+            log "Setting default value for $key: ${DEFAULTS[$key]}"
+            DATA+=([$key]=${DEFAULTS[$key]})
+        fi
+
+        # Check Regex
+        if [ ! -z "$regex" ]; then
+            log_debug "Regex has to be tested on key: $key (value: $val)"
+            if [[ ! $val =~ $regex ]]; then
+                log_color "Regex not valid for $key (value: $val)" "red"
+                log "Setting default value for $key: ${DEFAULTS[$key]}"
+                DATA+=([$key]=${DEFAULTS[$key]})
+            fi
+        fi
+    done
 }
 
 ###
