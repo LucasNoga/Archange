@@ -11,14 +11,14 @@ Developped in Bash v5.0.17
 - [Trouble-shootings](#trouble-shootings)
 - [Credits](#credits)
 
-#### Version v1.4.0
+#### Version v1.5.0
 
 ## Get Started
 
 You need to create a file call setting.conf in the repo like this
 
 ```bash
-$ git clone https://github.com/LucasNoga/archange.git
+$ git clone https://github.com/LucasNoga/Archange.git
 $ cd archange
 ```
 

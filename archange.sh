@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------
 # [Title] : Archange
 # [Description] : Save the history of a server
-# [Version] : v1.4.0
+# [Version] : v1.5.0
 # [Author] : Lucas Noga
 # [Shell] : Bash v5.0.17
 # [Usage] : ./archange.sh
@@ -13,7 +13,7 @@
 # ------------------------------------------------------------------
 
 PROJECT_NAME=ARCHANGE
-PROJECT_VERSION=v1.4.0
+PROJECT_VERSION=v1.5.0
 
 # Parameters to execute script
 typeset -A CONFIG=(
@@ -78,9 +78,9 @@ function read_config {
     read_config_server $configuration_file
 
     # Load the other data
-    CONFIG+=([folder_history]=$(eval echo $FOLDER_HISTORY))
+    set_config "folder_history" $(eval echo $FOLDER_HISTORY)
     if [ -z ${CONFIG[folder_history]} ]; then
-        CONFIG+=([folder_history]=${CONFIG[default_folder_history]})
+        set_config "folder_history" ${CONFIG[default_folder_history]}
         log "No folder define get default value of folder: $(log_color "${CONFIG[default_folder_history]}" "yellow")"
     fi
 
@@ -141,15 +141,16 @@ function read_options {
         log_debug "Option '$param' founded"
         case $param in
         "--erase-trace")
-            handle_erase_trace
+            log_debug "Erase Trace active"
+            set_option "erase_trace" "true"
             ;;
         "-c" | "--config" | "--show-config")
             show_settings
-            CONFIG+=([run]=false) # Only display config do not execute the history
+            set_config "run" "false" # Only display config do not execute the history
             ;;
         "-s" | "--setup" | "--setup-config")
             setup_settings
-            CONFIG+=([run]=false) # Only display config do not execute the history
+            set_config "run" "false" # Only display config do not execute the history
             ;;
         *) ;;
         esac
@@ -166,16 +167,26 @@ function active_debug_mode {
         log_debug "Debug Mode already activated"
         return
     fi
-    OPTIONS+=([debug]=true)
+    set_option "debug" "true"
     log_debug "Debug Mode Activated"
 }
 
 ###
-# Check if erase trace is asked in parameter
+# Set value to the OPTIONS array
+# $1 : [string] key to update
+# $2 : [string] value to set
 ###
-function handle_erase_trace {
-    OPTIONS+=([erase_trace]=true)
-    log_debug "Erase Trace active"
+function set_option {
+    OPTIONS+=([$1]=$2)
+}
+
+###
+# Set value to the CONFIG array
+# $1 : [string] key to update
+# $2 : [string] value to set
+###
+function set_config {
+    CONFIG+=([$1]=$2)
 }
 
 ###
@@ -318,21 +329,23 @@ function check_inputs {
         if [ $count -eq 0 ]; then
             log_debug "Setting default value for $key: ${DEFAULTS[$key]}"
             DATA+=([$key]=${DEFAULTS[$key]})
+            continue
         # if less than expected
         elif [ $count -lt $min_char ]; then
             log_color "Incorrect value for $key you need $min_char characters at least. You have only $count ($val)" "red"
             log "Setting default value for $key: ${DEFAULTS[$key]}"
             DATA+=([$key]=${DEFAULTS[$key]})
+            continue
         fi
 
-        # Check Regex
-        if [ ! -z "$regex" ]; then
-            log_debug "Regex has to be tested on key: $key (value: $val)"
-            if [[ ! $val =~ $regex ]]; then
-                log_color "Regex not valid for $key (value: $val)" "red"
-                log "Setting default value for $key: ${DEFAULTS[$key]}"
-                DATA+=([$key]=${DEFAULTS[$key]})
-            fi
+        # Check Regex if exists for
+        if
+            [ ! -z "$regex" ] &
+            [[ ! $val =~ $regex ]]
+        then
+            log_color "Regex not valid for $key (value: \"$val\")" "red"
+            log "Setting default value for $(log_color "$key: ${DEFAULTS[$key]}" "yellow")"
+            DATA+=([$key]=${DEFAULTS[$key]})
         fi
     done
 }
