@@ -78,9 +78,9 @@ function read_config {
     read_config_server $configuration_file
 
     # Load the other data
-    CONFIG+=([folder_history]=$(eval echo $FOLDER_HISTORY))
+    set_config "folder_history" $(eval echo $FOLDER_HISTORY)
     if [ -z ${CONFIG[folder_history]} ]; then
-        CONFIG+=([folder_history]=${CONFIG[default_folder_history]})
+        set_config "folder_history" ${CONFIG[default_folder_history]}
         log "No folder define get default value of folder: $(log_color "${CONFIG[default_folder_history]}" "yellow")"
     fi
 
@@ -146,11 +146,11 @@ function read_options {
             ;;
         "-c" | "--config" | "--show-config")
             show_settings
-            CONFIG+=([run]=false) # Only display config do not execute the history
+            set_config "run" "false" # Only display config do not execute the history
             ;;
         "-s" | "--setup" | "--setup-config")
             setup_settings
-            CONFIG+=([run]=false) # Only display config do not execute the history
+            set_config "run" "false" # Only display config do not execute the history
             ;;
         *) ;;
         esac
@@ -178,6 +178,15 @@ function active_debug_mode {
 ###
 function set_option {
     OPTIONS+=([$1]=$2)
+}
+
+###
+# Set value to the CONFIG array 
+# $1 : [string] key to update
+# $2 : [string] value to set
+###
+function set_config {
+    CONFIG+=([$1]=$2)
 }
 
 
