@@ -172,7 +172,7 @@ function active_debug_mode {
 }
 
 ###
-# Set value to the OPTIONS array 
+# Set value to the OPTIONS array
 # $1 : [string] key to update
 # $2 : [string] value to set
 ###
@@ -181,14 +181,13 @@ function set_option {
 }
 
 ###
-# Set value to the CONFIG array 
+# Set value to the CONFIG array
 # $1 : [string] key to update
 # $2 : [string] value to set
 ###
 function set_config {
     CONFIG+=([$1]=$2)
 }
-
 
 ###
 # List settings in settings.conf file if they are defined
@@ -330,21 +329,23 @@ function check_inputs {
         if [ $count -eq 0 ]; then
             log_debug "Setting default value for $key: ${DEFAULTS[$key]}"
             DATA+=([$key]=${DEFAULTS[$key]})
+            continue
         # if less than expected
         elif [ $count -lt $min_char ]; then
             log_color "Incorrect value for $key you need $min_char characters at least. You have only $count ($val)" "red"
             log "Setting default value for $key: ${DEFAULTS[$key]}"
             DATA+=([$key]=${DEFAULTS[$key]})
+            continue
         fi
 
-        # Check Regex
-        if [ ! -z "$regex" ]; then
-            log_debug "Regex has to be tested on key: $key (value: $val)"
-            if [[ ! $val =~ $regex ]]; then
-                log_color "Regex not valid for $key (value: $val)" "red"
-                log "Setting default value for $key: ${DEFAULTS[$key]}"
-                DATA+=([$key]=${DEFAULTS[$key]})
-            fi
+        # Check Regex if exists for
+        if
+            [ ! -z "$regex" ] &
+            [[ ! $val =~ $regex ]]
+        then
+            log_color "Regex not valid for $key (value: \"$val\")" "red"
+            log "Setting default value for $(log_color "$key: ${DEFAULTS[$key]}" "yellow")"
+            DATA+=([$key]=${DEFAULTS[$key]})
         fi
     done
 }
