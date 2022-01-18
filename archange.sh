@@ -31,6 +31,7 @@ typeset -A CONFIG=(
 typeset -A OPTIONS=(
     [debug]=false       # Debug mode to show more log
     [erase_trace]=false # if true we erase trace on the remote machine
+    [no_details]=false  # if true we get only the file name in our history if not we get ls --format=long --all --recursive --human-readable
 )
 
 # Parameters to get access to the remote machine
@@ -141,9 +142,14 @@ function read_options {
         log_debug "Option '$param' founded"
         case $param in
         "--erase-trace")
-            log_debug "Erase Trace active"
+            log_debug "Erase Trace activated"
             set_option "erase_trace" "true"
             ;;
+        "--no-details")
+            log_debug "No details activated"
+            set_option "no_details" "true"
+            ;;
+
         "-c" | "--config" | "--show-config")
             show_settings
             set_config "run" "false" # Only display config do not execute the history
@@ -470,7 +476,10 @@ function create_history {
         log_debug "Can create history from ${SERVER[path]} because it does exist"
     fi
 
-    sshpass -p ${SERVER[password]} ssh ${SERVER[user]}@${SERVER[ip]} -p ${SERVER[port]} "cd ${SERVER[path]} && ls . -R > ${CONFIG[server_file]}"
+    # get command to use in remote machine
+    cmd=$(get_remote_command)
+
+    sshpass -p ${SERVER[password]} ssh ${SERVER[user]}@${SERVER[ip]} -p ${SERVER[port]} "cd ${SERVER[path]} && $cmd > ${CONFIG[server_file]}"
     ret=$?
     # if something's wrong
     if [ ! $ret -eq 0 ]; then
@@ -479,6 +488,33 @@ function create_history {
         exit 1
     fi
     log $(log_color "History created on the server here:" "green") $(log_color ${SERVER[ip]}:${SERVER[path]}/${CONFIG[server_file]} "yellow")
+}
+
+###
+# Create command to execute in remote machine to get history
+# can be with date size and others or just the filename
+# return [string] the command to execute in remote machine
+###
+function get_remote_command {
+    options=""
+    cmd=""
+    # if only filename is wanted
+    if [ ${OPTIONS[no_details]} = true ]; then
+        cmd="ls . -R"
+    else # with size and date
+        # Show file like this (file --- size --- date )
+        columns='$7, $5, $6'
+        date_format="+%Y-%m-%d--%H:%M:%S"
+
+        space_field="\t\t\t\t\t"
+        space_line="\n"
+        cmd="ls . -lRh --time-style=$date_format | awk 'BEGIN { OFS = \"$space_field\"; ORS = \"$space_line\" } {print $columns}'"
+    fi
+
+    # Show file like this (file --- size --- date )
+    columns='$7, $5, $6'
+
+    echo $cmd
 }
 
 ###

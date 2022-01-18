@@ -78,6 +78,12 @@ $ ./archange.sh --debug
 $ ./archange.sh -d
 ```
 
+Only the filename in your history file instead of (size, date, etc...)
+
+```bash
+$ ./archange.sh --no-details
+```
+
 Show configuration data with your file
 
 ```bash
