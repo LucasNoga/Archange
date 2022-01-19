@@ -15,7 +15,7 @@ Developped in Bash v5.0.17
 
 ## Get Started
 
-You need to create a file call setting.conf in the repo like this
+You need to create a file call settings.conf in the repo like this
 
 ```bash
 $ git clone https://github.com/LucasNoga/Archange.git
@@ -84,18 +84,19 @@ Only the filename in your history file instead of (size, date, etc...)
 $ ./archange.sh --no-details
 ```
 
-Show history saved
+Show history saved if show-history=5 we display only the last 5 files backups
 
 ```bash
 $ ./archange.sh --show-history
+$ ./archange.sh --show-history=5
 ```
 
 Show configuration data with your file
 
 ```bash
 $ ./archange.sh -c
-$ ./archange.sh --config
-$ ./archange.sh --show-config
+$ ./archange.sh --settings
+$ ./archange.sh --show-settings
 ```
 
 Setup configuration file
@@ -103,7 +104,7 @@ Setup configuration file
 ```bash
 $ ./archange.sh -s
 $ ./archange.sh --setup
-$ ./archange.sh --setup-config
+$ ./archange.sh --setup-settings
 ```
 
 Erase trace on the server

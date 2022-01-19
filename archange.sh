@@ -9,7 +9,7 @@
 # [Usage] : ./archange.sh
 #           ./archange.sh --debug
 #           ./archange.sh --debug --setup
-#           ./archange.sh --show-config
+#           ./archange.sh --show-settings
 # ------------------------------------------------------------------
 
 PROJECT_NAME=ARCHANGE
@@ -18,8 +18,8 @@ PROJECT_VERSION=v1.5.0
 # Parameters to execute script
 typeset -A CONFIG=(
     [run]=true                                         # If run is to false we don't execute the script
-    [config_prefix]=$PROJECT_NAME                      # For settings.conf variable already used in the system ($USER, $PATH)
-    [config_file]="./settings.conf"                    # Configuration file
+    [settings_prefix]=$PROJECT_NAME                    # For settings.conf variable already used in the system ($USER, $PATH)
+    [settings_file]="./settings.conf"                  # Configuration file
     [server_file]="HISTORY.txt"                        # File created on the server to get history
     [folder_history]=""                                # Folder to store on the local machine the history
     [filename_history]=HISTORY-$(date +"%Y-%m-%d").txt # Name of the file which will get the copy (default HISTORY_date)
@@ -29,21 +29,22 @@ typeset -A CONFIG=(
 
 # Options params setup with command parameters
 typeset -A OPTIONS=(
-    [debug]=false          # Debug mode to show more log
-    [erase_trace]=false    # if true we erase trace on the remote machine
-    [show_history]=false   # If true launch script to show all history files
-    [show_settings]=false  # If true launch script to show configuration file
-    [setup_settings]=false # If true launch script to setup configuration file
-    [no_details]=false     # if true we get only the file name in our history if not we get ls --format=long --all --recursive --human-readable
+    [debug]=false            # Debug mode to show more log
+    [erase_trace]=false      # if true we erase trace on the remote machine
+    [show_history]=false     # If true launch script to show all history files
+    [show_history_number]=-1 # If number positive show the last N history files
+    [show_settings]=false    # If true launch script to show configuration file
+    [setup_settings]=false   # If true launch script to setup configuration file
+    [no_details]=false       # if true we get only the file name in our history if not we get ls --format=long --all --recursive --human-readable
 )
 
 # Parameters to get access to the remote machine
 typeset -A SERVER=(
-    [ip]=""       # ip of the server set in config
-    [port]=""     # port of the server set in config
-    [user]=""     # user of the server set in config
-    [password]="" # password of the server set in config
-    [path]=""     # path of the server set in config
+    [ip]=""       # ip of the server set in configuration file
+    [port]=""     # port of the server set in configuration file
+    [user]=""     # user of the server set in configuration file
+    [password]="" # password of the server set in configuration file
+    [path]=""     # path of the server set in configuration file
 )
 
 ###
@@ -54,7 +55,7 @@ function main {
     log_debug "Launch Project $(log_color "${PROJECT_NAME} : ${PROJECT_VERSION}" "magenta")"
 
     # Read .conf file (default ./setting.conf)
-    read_config ${CONFIG[config_file]}
+    read_settings ${CONFIG[settings_file]}
 
     # Launch specific script depend of options
     launch_script
@@ -66,7 +67,7 @@ function main {
 function launch_script {
     if [ ${OPTIONS[show_history]} == true ]; then
         log_debug "Showing history"
-        show_history ${CONFIG[folder_history]}
+        show_history ${CONFIG[folder_history]} ${OPTIONS[show_history_number]}
         return
     elif [ ${OPTIONS[show_settings]} == true ]; then
         show_settings
@@ -78,333 +79,6 @@ function launch_script {
 
     # Create the file to kept data history of your server
     launch_history
-}
-
-###
-# Setup variables from config file
-# $1 = path to the config file (default: ./setting.conf)
-###
-function read_config {
-    configuration_file=$1
-    log_debug "Read configuration file: $configuration_file"
-
-    if [ ! -f "$configuration_file" ]; then
-        log_color "ERROR: $configuration_file doesn't exists." "red"
-        log "Exiting..."
-        exit 1
-    fi
-
-    # Load configuration file
-    source $configuration_file
-    log_debug "Configuration file $configuration_file loaded"
-
-    # Load data to get access to remote machine
-    read_config_server $configuration_file
-
-    # Load the other data
-    set_config "folder_history" $(eval echo $FOLDER_HISTORY)
-    if [ -z ${CONFIG[folder_history]} ]; then
-        set_config "folder_history" ${CONFIG[default_folder_history]}
-        log "No folder define get default value of folder: $(log_color "${CONFIG[default_folder_history]}" "yellow")"
-    fi
-
-    log_debug "Dump: $(declare -p CONFIG)"
-    log_debug "Dump: $(declare -p SERVER)"
-}
-
-###
-# Setup remote machine (user, password, ip, port) from config file
-# $1 = path to the config file (default: ./setting.conf)
-###
-function read_config_server {
-    configuration_file=$1
-
-    SERVER+=(
-        [ip]=$(eval echo $IP)
-        [port]=$(eval echo $PORT)
-        [user]=$(eval echo \$${CONFIG[config_prefix]}"_USER") # Env variable already defined in the system ($USER) so we prefix it with ARCHANGE_
-        [password]=$(eval echo $PASSWORD)
-        [path]=$(eval echo \$${CONFIG[config_prefix]}"_PATH") # Env variable already defined in the system ($PATH) so we prefix it with ARCHANGE_
-    )
-
-    # Check empty values
-    if [ -z ${SERVER[ip]} ]; then
-        log_color "ERROR: IP is not defined into $configuration_file" "red"
-        log "Exiting..."
-        exit 1
-    fi
-    if [ -z ${SERVER[port]} ]; then
-        log_color "ERROR: PORT is not defined into $configuration_file" "red"
-        log "Exiting..."
-        exit 1
-    fi
-    if [ -z ${SERVER[user]} ]; then
-        log_color "ERROR: USER is not defined into $configuration_file" "red"
-        log "Exiting..."
-        exit 1
-    fi
-}
-
-################################################################### Params Scripts ###################################################################
-
-###
-# Setup params passed with the script
-# -d | --debug : Setup debug mode
-# --erase-trace : Erase file and your trace on remote machine
-###
-function read_options {
-    params=("$@") # Convert params into an array
-
-    # Check if debug exists between all parametters
-    for param in "${params[@]}"; do
-        [[ $param == "-d" ]] || [[ $param == "--debug" ]] && active_debug_mode
-    done
-
-    # Step through all params passed to the script
-    for param in "${params[@]}"; do
-        log_debug "Option '$param' founded"
-        case $param in
-        "--erase-trace")
-            log_debug "Erase Trace activated"
-            set_option "erase_trace" "true"
-            ;;
-        "--no-details")
-            log_debug "No details activated"
-            set_option "no_details" "true"
-            ;;
-        "--show-history")
-            set_option "show_history" "true"
-            ;;
-        "-c" | "--config" | "--show-config")
-            set_option "show_settings" "true"
-            ;;
-        "-s" | "--setup" | "--setup-config")
-            set_option "setup_settings" "true"
-            ;;
-        *) ;;
-        esac
-    done
-
-    log_debug "Dump: $(declare -p OPTIONS)"
-}
-
-###
-# Active the debug mode by changing options params
-###
-function active_debug_mode {
-    if [ ${OPTIONS[debug]} == true ]; then
-        log_debug "Debug Mode already activated"
-        return
-    fi
-    set_option "debug" "true"
-    log_debug "Debug Mode Activated"
-}
-
-###
-# Set value to the OPTIONS array
-# $1 : [string] key to update
-# $2 : [string] value to set
-###
-function set_option {
-    OPTIONS+=([$1]=$2)
-}
-
-###
-# Set value to the CONFIG array
-# $1 : [string] key to update
-# $2 : [string] value to set
-###
-function set_config {
-    CONFIG+=([$1]=$2)
-}
-
-###
-# List settings in settings.conf file if they are defined
-# $1: path where the settings file is (default: "./settings.conf")
-###
-function show_settings {
-    file=$1
-    # get default configuration file if no filled
-    if [ -z $file ]; then
-        file=${CONFIG[config_file]}
-    fi
-
-    read_config $file
-
-    log "Here's your settings: "
-    log "\t- Ip:" $(log_color "${SERVER[ip]}" "yellow")
-    log "\t- Port:" $(log_color "${SERVER[port]}" "yellow")
-    log "\t- User:" $(log_color "${SERVER[user]}" "yellow")
-    log "\t- Password:" $(log_color "${SERVER[password]}" "yellow")
-    log "\t- Path:" $(log_color "${SERVER[path]}" "yellow")
-    log "\t- File where the history is saved:" $(log_color "${CONFIG[folder_history]}/${CONFIG[filename_history]}" "yellow")
-}
-
-###
-# Setup the settings in command line for the user, if the file exists we erased it
-# $1: path where the settings file is (default: "./settings.conf")
-###
-function setup_settings {
-    file=$1
-    log "Setup settings need some intels to create your settings"
-    # get default configuration file if no filled
-    if [ -z $file ]; then
-        file=${CONFIG[config_file]}
-    fi
-
-    # Check if you want to override the file
-    if [ -f $file ]; then
-        override=$(ask_yes_no "$(log_color "$file" "yellow") already exists do you want to override it")
-        if [ "$override" == false ]; then
-            log_color "Abort settings editing - no override" "red"
-            exit 0
-        fi
-    fi
-
-    # DEFAULT VALUES
-    typeset -A DEFAULT_VALUES=(
-        [IP]="192.168.0.1"
-        [PORT]="22"
-        [USER]="root"
-        [PASSWORD]="root_password"
-        [PATH]="/mnt/disk"
-        [FOLDER_HISTORY]="./History"
-    )
-
-    log_debug "Dump: $(declare -p DEFAULT_VALUES)"
-
-    # Read value for the user
-    ip=$(read_data "Ip of remote machine (default: $(log_color ${DEFAULT_VALUES[IP]} yellow))" "number")
-    port=$(read_data "Port of remote machine (default: $(log_color ${DEFAULT_VALUES[PORT]} yellow))" "number")
-    path=$(read_data "Path of remote machine to save history on your machine (default: $(log_color ${DEFAULT_VALUES[PATH]} yellow))" "text")
-    user=$(read_data "User of remote machine (default: $(log_color ${DEFAULT_VALUES[USER]} yellow))" "text" 1)
-    folder=$(read_data "Folder local when you want to save your history (default: $(log_color ${DEFAULT_VALUES[FOLDER_HISTORY]} yellow))" "text")
-    password=$(read_data "Password of remote machine (default: $(log_color ${DEFAULT_VALUES[PASSWORD]} yellow))" "password")
-
-    typeset -A INPUTS+=(
-        [IP]="$ip"
-        [PORT]="$port"
-        [USER]="$user"
-        [PASSWORD]="$password"
-        [PATH]="$path"
-        [FOLDER_HISTORY]="$folder"
-    )
-
-    # Check all the inputs
-    check_inputs DEFAULT_VALUES INPUTS
-
-    log_debug "Dump: $(declare -p INPUTS)"
-
-    echo "\n"
-    for data in "${!INPUTS[@]}"; do
-        if [ $data == "PASSWORD" ]; then
-            log_debug "$data -> ${INPUTS[$data]}"
-        else
-            log_color "$data -> ${INPUTS[$data]}" "light_blue"
-        fi
-    done
-
-    confirmation=$(ask_yes_no "$(log_color "Do you want to apply this settings ?" "yellow")")
-    if [ "$confirmation" == false ]; then
-        log_color "Abort settings editing - no confirmation data" "red"
-        exit 0
-    fi
-
-    # Write the settings
-    write_settings_file $file "$(declare -p INPUTS)"
-
-    # show the new settings
-    show_settings $file
-}
-
-###
-# Check data filled by user and process it by replacing by default value if conditions are not satisfied
-# $1 : [Assoc-Array] default values set before
-# $2 : [Assoc-Array] inputs values from user
-# return [Assoc-Array] new inputs value
-###
-function check_inputs {
-    declare -n DEFAULTS="$1" # Get Reference of variable DEFAULTS_VALUE before to not get a copie
-    declare -n DATA=$2       # Get Reference of variable INPUTS before to not get a copie
-
-    for key in "${!DATA[@]}"; do
-        val=${DATA[$key]}
-        count=${#val}
-        case $key in
-        "IP")
-            min_char=1
-            regex="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
-            ;;
-        "PORT")
-            min_char=1
-            regex="^[0-9]{0,5}$"
-            ;;
-        "USER" | "PATH" | "PORT" | "FOLDER_HISTORY")
-            min_char=1
-            regex=""
-            ;;
-        "PASSWORD")
-            min_char=0
-            regex=""
-            ;;
-        *)
-            min_char=1 # Default character to check
-            regex=""
-            ;;
-        esac
-
-        # Do the check on char number
-        # if no values
-        if [ $count -eq 0 ]; then
-            log_debug "Setting default value for $key: ${DEFAULTS[$key]}"
-            DATA+=([$key]=${DEFAULTS[$key]})
-            continue
-        # if less than expected
-        elif [ $count -lt $min_char ]; then
-            log_color "Incorrect value for $key you need $min_char characters at least. You have only $count ($val)" "red"
-            log "Setting default value for $key: ${DEFAULTS[$key]}"
-            DATA+=([$key]=${DEFAULTS[$key]})
-            continue
-        fi
-
-        # Check Regex if exists for
-        if
-            [ ! -z "$regex" ] &
-            [[ ! $val =~ $regex ]]
-        then
-            log_color "Regex not valid for $key (value: \"$val\")" "red"
-            log "Setting default value for $(log_color "$key: ${DEFAULTS[$key]}" "yellow")"
-            DATA+=([$key]=${DEFAULTS[$key]})
-        fi
-    done
-}
-
-###
-# Write the file settings the settings in command line for the user, if the file exists we erased it
-# $1: [string] path where the settings file is (default: "./settings.conf")
-# $2: [array] data to insert into the setting like (ip, user of else)
-###
-function write_settings_file {
-    file=$1
-    eval "declare -A DATA="${2#*=} # eval string into a new associative array
-
-    # if file doesn't exist we create it
-    if [ ! -f $file ]; then
-        log_debug "Creating $(log_color "$file" "yellow")"
-        touch $file
-        log_debug "$(log_color "$file" "yellow") Created"
-    else
-        log_debug "Resetting old settings in $(log_color "$file" "yellow")"
-        >$file # Resetting file
-        log_debug "$(log_color "$file" "yellow") Reseted"
-    fi
-
-    echo "IP=${DATA[IP]}" >>$file
-    echo "PORT=${DATA[PORT]}" >>$file
-    echo "ARCHANGE_USER=${DATA[USER]}" >>$file
-    echo "PASSWORD=${DATA[PASSWORD]}" >>$file
-    echo "ARCHANGE_PATH=${DATA[PATH]}" >>$file
-    echo "FOLDER_HISTORY=${DATA[FOLDER_HISTORY]}" >>$file
 }
 
 ################################################################### Core ###################################################################
@@ -437,14 +111,17 @@ function launch_history {
 ###
 # Main method to show files history
 # $1 : [string] path to folder where history files are saved
+# $2 : [number] files to show (default: 10), -1 means all
 ###
 function show_history {
     folder=$1
+    files_to_show=$2
+
     exists=$(check_folder_exists $folder)
 
     # if not exists exit program
     if [ $exists -eq 0 ]; then
-        log "Path $(log_color "$folder" "yellow") doesn't exist.\nPlease change $(log_color "FOLDER_HISTORY" "yellow") value in $(log_color "${CONFIG[config_file]}" "yellow")"
+        log "Path $(log_color "$folder" "yellow") doesn't exist.\nPlease change $(log_color "FOLDER_HISTORY" "yellow") value in $(log_color "${CONFIG[settings_file]}" "yellow")"
         log "$(log_color "Because folder" "red") $(log_color "${SERVER[path]}" "magenta") $(log_color "doesn't exist in remote machine" "red")"
         exit 1
     fi
@@ -453,7 +130,20 @@ function show_history {
     size=$(($(get_terminal_width) - $(get_terminal_width) / 2))
 
     # Command to list history
-    ls -A1 --reverse --color=always $folder | nl | column -c $size
+    # cmd_list_history="ls -A1 --reverse --color=always $folder"
+    cmd_list_history="ls -A1 --reverse $folder"
+
+    # If we need to limit the files to show if not we displayed everything
+    [ $(is_a_number $files_to_show) = 1 ] && [ $files_to_show -gt "-1" ] && cmd_list_history+=" | head -$files_to_show"
+
+    # Display in column
+    col_num=3
+    cmd_list_history+=" | pr -${col_num}Tn --width $size"
+
+    log_debug "Command executed: $(log_color "$cmd_list_history" "yellow")"
+
+    # Execute final command
+    eval $cmd_list_history
 }
 
 ###
@@ -485,7 +175,7 @@ function get_folder {
 }
 
 ###
-# Read server password asked if it's not set in config
+# Read server password asked if it's not set in configuration
 ###
 function read_server_password {
     if [ -z ${SERVER[password]} ]; then
@@ -514,7 +204,7 @@ function create_history {
     folder_exists=$(check_server_folder_exists ${SERVER[path]})
     # if not exists exit program
     if [ $folder_exists -eq 0 ]; then
-        log "Please change $(log_color "${CONFIG[config_prefix]}_PATH" "yellow") in $(log_color "${CONFIG[config_file]}" "yellow")"
+        log "Please change $(log_color "${CONFIG[settings_prefix]}_PATH" "yellow") in $(log_color "${CONFIG[settings_file]}" "yellow")"
         log "$(log_color "Because folder" "red") $(log_color "${SERVER[path]}" "magenta") $(log_color "doesn't exist in remote machine" "red")"
         exit 1
     else
@@ -658,15 +348,338 @@ function check_server_file_exists {
     sshpass -p ${SERVER[password]} ssh -p ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]} -q [[ -f $filepath ]] && echo 1 || echo 0
 }
 
-###
-# Check if folder exists in param $1
-# $1 : [string] folder path to test
-# Return: [bool] 1 file exists, 0 if not
-###
-function check_folder_exists {
-    folder_path=$1
-    [[ -d $folder_path ]] && echo 1 || echo 0
+################################################################### Settings functions ###################################################################
 
+###
+# Setup variables from settings file
+# $1 = path to the settings file (default: ./setting.conf)
+###
+function read_settings {
+    settings_file=$1
+    log_debug "Read configuration file: $settings_file"
+
+    if [ ! -f "$settings_file" ]; then
+        log "WARN: $settings_file doesn't exists." "yellow"
+        log_color "Creating the file ${CONFIG[settings_file]}..."
+        setup_settings ${CONFIG[settings_file]}
+
+    fi
+
+    # Load configuration file
+    source $settings_file
+    log_debug "Configuration file $settings_file loaded"
+
+    # Load data to get access to remote machine
+    read_settings_server $settings_file
+
+    # Load the other data
+    set_settings "folder_history" $(eval echo $FOLDER_HISTORY)
+    if [ -z ${CONFIG[folder_history]} ]; then
+        set_settings "folder_history" ${CONFIG[default_folder_history]}
+        log "No folder define get default value of folder: $(log_color "${CONFIG[default_folder_history]}" "yellow")"
+    fi
+
+    log_debug "Dump: $(declare -p CONFIG)"
+    log_debug "Dump: $(declare -p SERVER)"
+}
+
+###
+# Setup remote machine (user, password, ip, port) from configuration file
+# $1 = path to the config file (default: ./setting.conf)
+###
+function read_settings_server {
+    settings_file=$1
+
+    SERVER+=(
+        [ip]=$(eval echo $IP)
+        [port]=$(eval echo $PORT)
+        [user]=$(eval echo \$${CONFIG[settings_prefix]}"_USER") # Env variable already defined in the system ($USER) so we prefix it with ARCHANGE_
+        [password]=$(eval echo $PASSWORD)
+        [path]=$(eval echo \$${CONFIG[settings_prefix]}"_PATH") # Env variable already defined in the system ($PATH) so we prefix it with ARCHANGE_
+    )
+
+    # Check empty values
+    if [ -z ${SERVER[ip]} ]; then
+        log_color "ERROR: IP is not defined into $settings_file" "red"
+        log "Exiting..."
+        exit 1
+    fi
+    if [ -z ${SERVER[port]} ]; then
+        log_color "ERROR: PORT is not defined into $settings_file" "red"
+        log "Exiting..."
+        exit 1
+    fi
+    if [ -z ${SERVER[user]} ]; then
+        log_color "ERROR: USER is not defined into $settings_file" "red"
+        log "Exiting..."
+        exit 1
+    fi
+}
+
+###
+# List settings in settings.conf file if they are defined
+# $1: path where the settings file is (default: "./settings.conf")
+###
+function show_settings {
+    file=$1
+    # get default configuration file if no filled
+    if [ -z $file ]; then
+        file=${CONFIG[settings_file]}
+    fi
+
+    read_settings $file
+
+    log "Here's your settings: "
+    log "\t- Ip:" $(log_color "${SERVER[ip]}" "yellow")
+    log "\t- Port:" $(log_color "${SERVER[port]}" "yellow")
+    log "\t- User:" $(log_color "${SERVER[user]}" "yellow")
+    log "\t- Password:" $(log_color "${SERVER[password]}" "yellow")
+    log "\t- Path:" $(log_color "${SERVER[path]}" "yellow")
+    log "\t- File where the history is saved:" $(log_color "${CONFIG[folder_history]}/${CONFIG[filename_history]}" "yellow")
+}
+
+###
+# Setup the settings in command line for the user, if the file exists we erased it
+# $1: path where the settings file is (default: "./settings.conf")
+###
+function setup_settings {
+    file=$1
+    log "Setup settings need some intels to create your settings"
+    # get default configuration file if no filled
+    if [ -z $file ]; then
+        file=${CONFIG[settings_file]}
+    fi
+    # Check if you want to override the file
+    if [ -f $file ]; then
+        override=$(ask_yes_no "$(log_color "$file" "yellow") already exists do you want to override it")
+        if [ "$override" == false ]; then
+            log_color "Abort settings editing - no override" "red"
+            exit 0
+        fi
+    fi
+
+    # DEFAULT VALUES
+    typeset -A DEFAULT_VALUES=(
+        [IP]="192.168.0.1"
+        [PORT]="22"
+        [USER]="root"
+        [PASSWORD]="root_password"
+        [PATH]="/mnt/disk"
+        [FOLDER_HISTORY]="./History"
+    )
+
+    log_debug "Dump: $(declare -p DEFAULT_VALUES)"
+
+    # Read value for the user
+    ip=$(read_data "Ip of remote machine (default: $(log_color ${DEFAULT_VALUES[IP]} yellow))" "number")
+    port=$(read_data "Port of remote machine (default: $(log_color ${DEFAULT_VALUES[PORT]} yellow))" "number")
+    path=$(read_data "Path of remote machine to save history on your machine (default: $(log_color ${DEFAULT_VALUES[PATH]} yellow))" "text")
+    user=$(read_data "User of remote machine (default: $(log_color ${DEFAULT_VALUES[USER]} yellow))" "text" 1)
+    folder=$(read_data "Folder local when you want to save your history (default: $(log_color ${DEFAULT_VALUES[FOLDER_HISTORY]} yellow))" "text")
+    password=$(read_data "Password of remote machine (default: $(log_color ${DEFAULT_VALUES[PASSWORD]} yellow))" "password")
+
+    typeset -A INPUTS+=(
+        [IP]="$ip"
+        [PORT]="$port"
+        [USER]="$user"
+        [PASSWORD]="$password"
+        [PATH]="$path"
+        [FOLDER_HISTORY]="$folder"
+    )
+
+    # Check all the inputs
+    check_inputs DEFAULT_VALUES INPUTS
+
+    log_debug "Dump: $(declare -p INPUTS)"
+
+    echo "\n"
+    for data in "${!INPUTS[@]}"; do
+        if [ $data == "PASSWORD" ]; then
+            log_debug "$data -> ${INPUTS[$data]}"
+        else
+            log_color "$data -> ${INPUTS[$data]}" "light_blue"
+        fi
+    done
+
+    confirmation=$(ask_yes_no "$(log_color "Do you want to apply this settings ?" "yellow")")
+    if [ "$confirmation" == false ]; then
+        log_color "Abort settings editing - no confirmation data" "red"
+        exit 0
+    fi
+
+    # Write the settings
+    write_settings_file $file "$(declare -p INPUTS)"
+
+    # show the new settings
+    show_settings $file
+
+    log "You can now restart the script"
+    exit 0
+}
+
+###
+# Check data filled by user and process it by replacing by default value if conditions are not satisfied
+# $1 : [Assoc-Array] default values set before
+# $2 : [Assoc-Array] inputs values from user
+# return [Assoc-Array] new inputs value
+###
+function check_inputs {
+    declare -n DEFAULTS="$1" # Get Reference of variable DEFAULTS_VALUE before to not get a copie
+    declare -n DATA=$2       # Get Reference of variable INPUTS before to not get a copie
+
+    for key in "${!DATA[@]}"; do
+        val=${DATA[$key]}
+        count=${#val}
+        case $key in
+        "IP")
+            min_char=1
+            regex="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+            ;;
+        "PORT")
+            min_char=1
+            regex="^[0-9]{0,5}$"
+            ;;
+        "USER" | "PATH" | "PORT" | "FOLDER_HISTORY")
+            min_char=1
+            regex=""
+            ;;
+        "PASSWORD")
+            min_char=0
+            regex=""
+            ;;
+        *)
+            min_char=1 # Default character to check
+            regex=""
+            ;;
+        esac
+
+        # Do the check on char number
+        # if no values
+        if [ $count -eq 0 ]; then
+            log_debug "Setting default value for $key: ${DEFAULTS[$key]}"
+            DATA+=([$key]=${DEFAULTS[$key]})
+            continue
+        # if less than expected
+        elif [ $count -lt $min_char ]; then
+            log_color "Incorrect value for $key you need $min_char characters at least. You have only $count ($val)" "red"
+            log "Setting default value for $key: ${DEFAULTS[$key]}"
+            DATA+=([$key]=${DEFAULTS[$key]})
+            continue
+        fi
+
+        # Check Regex if exists for
+        if
+            [ ! -z "$regex" ] &
+            [[ ! $val =~ $regex ]]
+        then
+            log_color "Regex not valid for $key (value: \"$val\")" "red"
+            log "Setting default value for $(log_color "$key: ${DEFAULTS[$key]}" "yellow")"
+            DATA+=([$key]=${DEFAULTS[$key]})
+        fi
+    done
+}
+
+###
+# Write the file settings the settings in command line for the user, if the file exists we erased it
+# $1: [string] path where the settings file is (default: "./settings.conf")
+# $2: [array] data to insert into the setting like (ip, user of else)
+###
+function write_settings_file {
+    file=$1
+    eval "declare -A DATA="${2#*=} # eval string into a new associative array
+
+    # if file doesn't exist we create it
+    if [ ! -f $file ]; then
+        log_debug "Creating $(log_color "$file" "yellow")"
+        touch $file
+        log_debug "$(log_color "$file" "yellow") Created"
+    else
+        log_debug "Resetting old settings in $(log_color "$file" "yellow")"
+        >$file # Resetting file
+        log_debug "$(log_color "$file" "yellow") Reseted"
+    fi
+
+    echo "IP=${DATA[IP]}" >>$file
+    echo "PORT=${DATA[PORT]}" >>$file
+    echo "ARCHANGE_USER=${DATA[USER]}" >>$file
+    echo "PASSWORD=${DATA[PASSWORD]}" >>$file
+    echo "ARCHANGE_PATH=${DATA[PATH]}" >>$file
+    echo "FOLDER_HISTORY=${DATA[FOLDER_HISTORY]}" >>$file
+}
+
+###
+# Set value to the CONFIG array
+# $1 : [string] key to update
+# $2 : [string] value to set
+###
+function set_settings {
+    CONFIG+=([$1]=$2)
+}
+
+################################################################### Options functions ###################################################################
+
+###
+# Setup params passed with the script
+# -d | --debug : Setup debug mode
+# --erase-trace : Erase file and your trace on remote machine
+###
+function read_options {
+    params=("$@") # Convert params into an array
+
+    # Check if debug exists between all parametters
+    for param in "${params[@]}"; do
+        [[ $param == "-d" ]] || [[ $param == "--debug" ]] && active_debug_mode
+    done
+
+    # Step through all params passed to the script
+    for param in "${params[@]}"; do
+        IFS="=" read -r key value <<<"${param}"
+        [[ -z $value ]] && log_debug "Option key '$key' founded" || log_debug "Option key '$key' value '$value' founded"
+        case $key in
+        "--erase-trace")
+            log_debug "Erase Trace activated"
+            set_option "erase_trace" "true"
+            ;;
+        "--no-details")
+            log_debug "No details activated"
+            set_option "no_details" "true"
+            ;;
+        "--show-history")
+            set_option "show_history" "true"
+            [ -n $value ] && set_option "show_history_number" "$value" # Si une valeur est renseigné on update l'option
+            ;;
+        "-c" | "--settings" | "--show-settings")
+            set_option "show_settings" "true"
+            ;;
+        "-s" | "--setup" | "--setup-settings")
+            set_option "setup_settings" "true"
+            ;;
+        *) ;;
+        esac
+    done
+
+    log_debug "Dump: $(declare -p OPTIONS)"
+}
+
+###
+# Active the debug mode by changing options params
+###
+function active_debug_mode {
+    if [ ${OPTIONS[debug]} == true ]; then
+        log_debug "Debug Mode already activated"
+        return
+    fi
+    set_option "debug" "true"
+    log_debug "Debug Mode Activated"
+}
+
+###
+# Set value to the OPTIONS array
+# $1 : [string] key to update
+# $2 : [string] value to set
+###
+function set_option {
+    OPTIONS+=([$1]=$2)
 }
 
 ################################################################### Utils functions ###################################################################
@@ -735,11 +748,31 @@ function print_array {
 }
 
 ###
+# Check if folder exists in param $1
+# $1 : [string] folder path to test
+# Return: [bool] 1 file exists, 0 if not
+###
+function check_folder_exists {
+    folder_path=$1
+    [[ -d $folder_path ]] && echo 1 || echo 0
+
+}
+
+###
 # Get the terminal witdh in character
 # return [number] : width of the terminal screen
 ###
 function get_terminal_width {
     echo $(tput cols)
+}
+
+###
+# Test if value is a number or not
+# $1 : [string] value to test
+# return boolean: true if $1 is a number false if not
+###
+function is_a_number {
+    [ "$1" -eq "$1" ] 2>/dev/null && echo 1 || echo 0
 }
 
 ################################################################### Logging functions ###################################################################
