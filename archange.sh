@@ -29,9 +29,12 @@ typeset -A CONFIG=(
 
 # Options params setup with command parameters
 typeset -A OPTIONS=(
-    [debug]=false       # Debug mode to show more log
-    [erase_trace]=false # if true we erase trace on the remote machine
-    [no_details]=false  # if true we get only the file name in our history if not we get ls --format=long --all --recursive --human-readable
+    [debug]=false          # Debug mode to show more log
+    [erase_trace]=false    # if true we erase trace on the remote machine
+    [show_history]=false   # If true launch script to show all history files
+    [show_settings]=false  # If true launch script to show configuration file
+    [setup_settings]=false # If true launch script to setup configuration file
+    [no_details]=false     # if true we get only the file name in our history if not we get ls --format=long --all --recursive --human-readable
 )
 
 # Parameters to get access to the remote machine
@@ -52,6 +55,26 @@ function main {
 
     # Read .conf file (default ./setting.conf)
     read_config ${CONFIG[config_file]}
+
+    # Launch specific script depend of options
+    launch_script
+}
+
+###
+# Show which script to execute default (history)
+###
+function launch_script {
+    if [ ${OPTIONS[show_history]} == true ]; then
+        log_debug "Showing history"
+        show_history ${CONFIG[folder_history]}
+        return
+    elif [ ${OPTIONS[show_settings]} == true ]; then
+        show_settings
+        return
+    elif [ ${OPTIONS[setup_settings]} == true ]; then
+        setup_settings
+        return
+    fi
 
     # Create the file to kept data history of your server
     launch_history
@@ -149,14 +172,14 @@ function read_options {
             log_debug "No details activated"
             set_option "no_details" "true"
             ;;
-
+        "--show-history")
+            set_option "show_history" "true"
+            ;;
         "-c" | "--config" | "--show-config")
-            show_settings
-            set_config "run" "false" # Only display config do not execute the history
+            set_option "show_settings" "true"
             ;;
         "-s" | "--setup" | "--setup-config")
-            setup_settings
-            set_config "run" "false" # Only display config do not execute the history
+            set_option "setup_settings" "true"
             ;;
         *) ;;
         esac
@@ -387,7 +410,7 @@ function write_settings_file {
 ################################################################### Core ###################################################################
 
 ###
-# Main method to run history
+# Main method to create history
 ###
 function launch_history {
     if [ "${CONFIG[run]}" = false ]; then
@@ -409,6 +432,28 @@ function launch_history {
     if [ "${OPTIONS[erase_trace]}" = true ]; then
         erase_trace
     fi
+}
+
+###
+# Main method to show files history
+# $1 : [string] path to folder where history files are saved
+###
+function show_history {
+    folder=$1
+    exists=$(check_folder_exists $folder)
+
+    # if not exists exit program
+    if [ $exists -eq 0 ]; then
+        log "Path $(log_color "$folder" "yellow") doesn't exist.\nPlease change $(log_color "FOLDER_HISTORY" "yellow") value in $(log_color "${CONFIG[config_file]}" "yellow")"
+        log "$(log_color "Because folder" "red") $(log_color "${SERVER[path]}" "magenta") $(log_color "doesn't exist in remote machine" "red")"
+        exit 1
+    fi
+
+    # Get middle of the screen size
+    size=$(($(get_terminal_width) - $(get_terminal_width) / 2))
+
+    # Command to list history
+    ls -A1 --reverse --color=always $folder | nl | column -c $size
 }
 
 ###
@@ -613,6 +658,17 @@ function check_server_file_exists {
     sshpass -p ${SERVER[password]} ssh -p ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]} -q [[ -f $filepath ]] && echo 1 || echo 0
 }
 
+###
+# Check if folder exists in param $1
+# $1 : [string] folder path to test
+# Return: [bool] 1 file exists, 0 if not
+###
+function check_folder_exists {
+    folder_path=$1
+    [[ -d $folder_path ]] && echo 1 || echo 0
+
+}
+
 ################################################################### Utils functions ###################################################################
 
 ###
@@ -676,6 +732,14 @@ function read_data {
 function print_array {
     eval "declare -A func_assoc_array="${1#*=} # eval string into a new associative array
     declare -p func_assoc_array                # proof that array was successfully created
+}
+
+###
+# Get the terminal witdh in character
+# return [number] : width of the terminal screen
+###
+function get_terminal_width {
+    echo $(tput cols)
 }
 
 ################################################################### Logging functions ###################################################################

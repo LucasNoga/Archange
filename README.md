@@ -84,6 +84,12 @@ Only the filename in your history file instead of (size, date, etc...)
 $ ./archange.sh --no-details
 ```
 
+Show history saved
+
+```bash
+$ ./archange.sh --show-history
+```
+
 Show configuration data with your file
 
 ```bash
