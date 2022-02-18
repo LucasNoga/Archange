@@ -1,6 +1,6 @@
 # Archange project
 
-**_Version v1.5.0_**
+**_Version v1.6.0_**
 
 Save the history of a server by creating a file history
 
@@ -17,11 +17,6 @@ Developped in Bash `v5.1.0`
 - [Manual Process](#manual-process)
 - [Trouble-shootings](#trouble-shootings)
 - [Credits](#credits)
-
-## Comming next
-
-- Integrate Auto-completion for Archange options
-- Add pagination in `--show_history` options
 
 ## Get Started
 

@@ -3,16 +3,16 @@
 # ------------------------------------------------------------------
 # [Title] : Archange
 # [Description] : Save the history of a server
-# [Version] : v1.5.0
+# [Version] : v1.6.0
 # [Author] : Lucas Noga
-# [Shell] : Bash v5.0.17
+# [Shell] : Bash v5.1.0
 # [Usage] : ./archange.sh
 #           ./archange.sh --verbose
 #           ./archange.sh --setup
 # ------------------------------------------------------------------
 
 PROJECT_NAME=ARCHANGE
-PROJECT_VERSION=v1.5.0
+PROJECT_VERSION=v1.6.0
 
 # Parameters to execute script
 typeset -A CONFIG=(
