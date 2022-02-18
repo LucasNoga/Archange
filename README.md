@@ -1,9 +1,16 @@
 # Archange project
 
-Save the history of a server by creating a file history using ls -R command  
-Developped in Bash v5.0.17
+**_Version v1.6.0_**
 
+Save the history of a server by creating a file history
+
+Developped in Bash `v5.1.0`
+
+## Index
+
+- [Comming Next](#comming-next)
 - [Get Started](#get-started)
+- [Create alias](#create-a-persistant-alias)
 - [How to use](#how-to-use)
 - [Script options](#script-options)
 - [Export configuration of DSM](#export-configuration-of-dsm)
@@ -11,21 +18,19 @@ Developped in Bash v5.0.17
 - [Trouble-shootings](#trouble-shootings)
 - [Credits](#credits)
 
-#### Version v1.5.0
-
 ## Get Started
 
-You need to create a file call setting.conf in the repo like this
+You need to create a file call settings.conf in the repo like this
 
 ```bash
 $ git clone https://github.com/LucasNoga/Archange.git
 $ cd archange
 ```
 
-Then create your configuration file **settings.conf**
+Then create your configuration file **settings.conf** base on the sample
 
 ```bash
-$ touch settings.conf
+$ cp settings.sample.conf settings.conf
 $ vim settings.conf
 ```
 
@@ -59,39 +64,79 @@ ARCHANGE_PATH="/server/dev" # get history files to the folder /server/dev
 FOLDER_HISTORY="./MyHistory" # Store files into the folder ./MyHistory
 ```
 
-## How to use
+## Create a persistant alias
 
 ```bash
-$ chmod +x archange.sh
-$ cp settings.sample.conf settings.conf
+vim ~/.bash_aliases
+```
+
+Then put this line
+
+```bash
+alias archange="<PATH_TO_REPO>/archange.sh"
+```
+
+Then in your `~/.bashrc` or `~/bash_profile` execute `bash_aliases` with this
+
+```bash
+if [ -f ~/.bash_aliases ]; then
+. ~/.bash_aliases
+fi
+```
+
+## How to use
+
+If you setup the alias
+
+```bash
+$ archange
+```
+
+if not
+
+```bash
 $ ./archange.sh
 ```
 
-Then follow instructions in your terminal
-
 ## Script options
+
+Here's are the options on purpose  
+Show help of the script
+
+```bash
+$ ./archange.sh --help
+```
 
 Display debug mode
 
 ```bash
-$ ./archange.sh --debug
-$ ./archange.sh -d
+$ ./archange.sh -v
+$ ./archange.sh --verbose
+```
+
+Only the filename in your history file instead of (size, date, etc...)
+
+```bash
+$ ./archange.sh --no-details
+```
+
+Show history saved if history=5 we display only the last 5 files backups
+
+```bash
+$ ./archange.sh -history
+$ ./archange.sh -history=5
 ```
 
 Show configuration data with your file
 
 ```bash
-$ ./archange.sh -c
-$ ./archange.sh --config
-$ ./archange.sh --show-config
+$ ./archange.sh --show-settings
 ```
 
 Setup configuration file
 
 ```bash
-$ ./archange.sh -s
 $ ./archange.sh --setup
-$ ./archange.sh --setup-config
 ```
 
 Erase trace on the server
