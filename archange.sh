@@ -100,13 +100,6 @@ function launch_history {
         return
     fi
 
-    # If folder doens't define in file config we define it here
-    if [ -z "${CONFIG[folder_history]}" ]; then
-        folder_history="${CONFIG[script_location]}/${CONFIG[default_folder_history]}"
-        set_settings "folder_history" "$folder_history"
-        log "No folder history defined. Get default value: $(log_color "$folder_history" "yellow")"
-    fi
-
     setup_folder_history "${CONFIG[folder_history]}"
 
     get_server_path_history
@@ -132,7 +125,7 @@ function show_history {
     folder=$1
     files_to_show=$2
 
-    exists=$(check_folder_exists $folder)
+    exists=$(check_folder_exists "$folder")
 
     # if not exists exit program
     if [ $exists -eq 0 ]; then
@@ -141,24 +134,28 @@ function show_history {
         exit 1
     fi
 
-    # Get middle of the screen size
-    size=$(($(get_terminal_width) - $(get_terminal_width) / 2))
-
     # Command to list history
-    # cmd_list_history="ls -A1 --reverse --color=always $folder"
-    cmd_list_history="ls -A1 --reverse $folder"
+    cmd_list_history="ls -A1 --reverse '$folder'"
 
     # If we need to limit the files to show if not we displayed everything
     [ $(is_a_number $files_to_show) = 1 ] && [ $files_to_show -gt "-1" ] && cmd_list_history+=" | head -$files_to_show"
 
-    # Display in column
-    col_num=3
+    # Display in column depend of the size
+    size=$(($(get_terminal_width)))
+    if [ $size -lt 40 ]; then
+        col_num=1
+    elif [ $size -lt 80 ]; then
+        col_num=2
+    else
+        col_num=3
+    fi
+
     cmd_list_history+=" | pr -${col_num}Tn --width $size"
 
     log_debug "Command executed: $(log_color "$cmd_list_history" "yellow")"
 
     # Execute final command
-    eval $cmd_list_history
+    eval "$cmd_list_history"
 }
 
 ###
@@ -382,6 +379,13 @@ function read_settings {
     read_settings_server $settings_file
 
     set_settings "folder_history" "$FOLDER_HISTORY"
+
+    # If folder doens't define in file config we define it here
+    if [ -z "${CONFIG[folder_history]}" ]; then
+        folder_history="${CONFIG[script_location]}/${CONFIG[default_folder_history]}"
+        set_settings "folder_history" "$folder_history"
+        log_debug "No folder history defined. Get default folder: $(log_color "$folder_history" "yellow")"
+    fi
 
     log_debug "Dump: $(declare -p CONFIG)"
     log_debug "Dump: $(declare -p SERVER)"
@@ -761,9 +765,8 @@ function print_array {
 # Return: [bool] 1 file exists, 0 if not
 ###
 function check_folder_exists {
-    folder_path=$1
-    [[ -d $folder_path ]] && echo 1 || echo 0
-
+    folder="$1"
+    [[ -d "$folder" ]] && echo 1 || echo 0
 }
 
 ###
