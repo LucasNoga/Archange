@@ -7,9 +7,8 @@
 # [Author] : Lucas Noga
 # [Shell] : Bash v5.0.17
 # [Usage] : ./archange.sh
-#           ./archange.sh --debug
-#           ./archange.sh --debug --setup
-#           ./archange.sh --show-settings
+#           ./archange.sh --verbose
+#           ./archange.sh --setup
 # ------------------------------------------------------------------
 
 PROJECT_NAME=ARCHANGE
@@ -29,13 +28,14 @@ typeset -A CONFIG=(
 
 # Options params setup with command parameters
 typeset -A OPTIONS=(
-    [debug]=false            # Debug mode to show more log
-    [erase_trace]=false      # if true we erase trace on the remote machine
-    [show_history]=false     # If true launch script to show all history files
-    [show_history_number]=-1 # If number positive show the last N history files
-    [show_settings]=false    # If true launch script to show configuration file
-    [setup_settings]=false   # If true launch script to setup configuration file
-    [no_details]=false       # if true we get only the file name in our history if not we get ls --format=long --all --recursive --human-readable
+    [debug]=false          # Debug mode to show more log if verbose is activated
+    [help]=false           # If true we show the help
+    [erase_trace]=false    # If true we erase trace on the remote machine
+    [history]=false        # If true launch script to show all history files
+    [history_number]=-1    # If number positive show the last N history files
+    [show_settings]=false  # If true launch script to show configuration file
+    [setup_settings]=false # If true launch script to setup configuration file
+    [no_details]=false     # if true we get only the file name in our history if not we get ls --format=long --all --recursive --human-readable
 )
 
 # Parameters to get access to the remote machine
@@ -65,9 +65,12 @@ function main {
 # Show which script to execute default (history)
 ###
 function launch_script {
-    if [ ${OPTIONS[show_history]} == true ]; then
+    if [ ${OPTIONS[history]} == true ]; then
         log_debug "Showing history"
-        show_history ${CONFIG[folder_history]} ${OPTIONS[show_history_number]}
+        show_history ${CONFIG[folder_history]} ${OPTIONS[history_number]}
+        return
+    elif [ ${OPTIONS[help]} == true ]; then
+        help
         return
     elif [ ${OPTIONS[show_settings]} == true ]; then
         show_settings
@@ -208,7 +211,7 @@ function create_history {
         log "$(log_color "Because folder" "red") $(log_color "${SERVER[path]}" "magenta") $(log_color "doesn't exist in remote machine" "red")"
         exit 1
     else
-        log_debug "Can create history from ${SERVER[path]} because it does exist"
+        log_debug "Path ${SERVER[path]} exists history creating..."
     fi
 
     # get command to use in remote machine
@@ -236,19 +239,9 @@ function get_remote_command {
     # if only filename is wanted
     if [ ${OPTIONS[no_details]} = true ]; then
         cmd="ls . -R"
-    else # with size and date
-        # Show file like this (file --- size --- date )
-        columns='$7, $5, $6'
-        date_format="+%Y-%m-%d--%H:%M:%S"
-
-        space_field="\t\t\t\t\t"
-        space_line="\n"
-        cmd="ls . -lRh --time-style=$date_format | awk 'BEGIN { OFS = \"$space_field\"; ORS = \"$space_line\" } {print $columns}'"
+    else # with data formatted
+        cmd="ls . -lRh --time-style=+%Y-%m-%d--%H:%M:%S"
     fi
-
-    # Show file like this (file --- size --- date )
-    columns='$7, $5, $6'
-
     echo $cmd
 }
 
@@ -366,7 +359,7 @@ function read_settings {
     fi
 
     # Load configuration file
-    source $settings_file
+    . $settings_file
     log_debug "Configuration file $settings_file loaded"
 
     # Load data to get access to remote machine
@@ -628,7 +621,7 @@ function read_options {
 
     # Check if debug exists between all parametters
     for param in "${params[@]}"; do
-        [[ $param == "-d" ]] || [[ $param == "--debug" ]] && active_debug_mode
+        [[ $param == "-v" ]] || [[ $param == "--verbose" ]] && active_debug_mode
     done
 
     # Step through all params passed to the script
@@ -636,6 +629,10 @@ function read_options {
         IFS="=" read -r key value <<<"${param}"
         [[ -z $value ]] && log_debug "Option key '$key' founded" || log_debug "Option key '$key' value '$value' founded"
         case $key in
+        "--help")
+            log_debug "Help script activated"
+            set_option "help" "true"
+            ;;
         "--erase-trace")
             log_debug "Erase Trace activated"
             set_option "erase_trace" "true"
@@ -644,14 +641,14 @@ function read_options {
             log_debug "No details activated"
             set_option "no_details" "true"
             ;;
-        "--show-history")
-            set_option "show_history" "true"
-            [ -n $value ] && set_option "show_history_number" "$value" # Si une valeur est renseigné on update l'option
+        "--history")
+            set_option "history" "true"
+            [ -n $value ] && set_option "history_number" "$value" # If a value is entered we update the option
             ;;
-        "-c" | "--settings" | "--show-settings")
+        "--show-settings")
             set_option "show_settings" "true"
             ;;
-        "-s" | "--setup" | "--setup-settings")
+        "--setup")
             set_option "setup_settings" "true"
             ;;
         *) ;;
@@ -775,6 +772,28 @@ function is_a_number {
     [ "$1" -eq "$1" ] 2>/dev/null && echo 1 || echo 0
 }
 
+###
+# Return string which match to regex from data
+# $1 : [string] data to test
+# $2 : [string] regex to apply to data
+###
+function grep_content {
+    data=$1
+    regex=$2
+    echo $(echo $data | grep -oE "$regex")
+}
+
+###
+# Return a group of content which match to regex from data
+# $1 : [string] data to test
+# $2 : [string] group regex to catch
+###
+function grep_group_content {
+    data=$1
+    regex=$2
+    echo $(echo $data | grep -oP "$regex")
+}
+
 ################################################################### Logging functions ###################################################################
 
 ###
@@ -822,6 +841,25 @@ function log_debug {
     message=$@
     date=$(get_datetime)
     if [ "${OPTIONS[debug]}" = true ]; then log_color "[$date] $message" ${CONFIG[debug_color]}; fi
+}
+
+################################################################################
+# Help                                                                         #
+################################################################################
+help() {
+    log "Usage archange [OPTION]..."
+    log "Version $PROJECT_VERSION"
+    log "Save the history of a server with a ls command by creating a file history in the local machine"
+    log
+    log "Syntax: archange [-v|--no-details|--setup|--history]"
+    log "Options:"
+
+    log "\t --erase-trace \t\t Erase trace on the server"
+    log "\t --history=<N> \t Show history saved if where N is the number of history files to show (ex: history=5) we display only the last 5 files backups, (default unlimited)"
+    log "\t --no-details \t\t Get only the filename in your history file instead of (size, date, etc...)"
+    log "\t --setup \t\t Setup configuration file"
+    log "\t --show-settings \t Show configuration data with your file"
+    log "\t -v, --verbose \t\t Verbose mode"
 }
 
 main $@

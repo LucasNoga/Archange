@@ -1,8 +1,14 @@
 # Archange project
 
-Save the history of a server by creating a file history using ls -R command  
-Developped in Bash v5.0.17
+**_Version v1.5.0_**
 
+Save the history of a server by creating a file history
+
+Developped in Bash `v5.1.0`
+
+## Index
+
+- [Comming Next](#comming-next)
 - [Get Started](#get-started)
 - [How to use](#how-to-use)
 - [Script options](#script-options)
@@ -11,7 +17,11 @@ Developped in Bash v5.0.17
 - [Trouble-shootings](#trouble-shootings)
 - [Credits](#credits)
 
-#### Version v1.5.0
+## Comming next
+
+- Integrate Auto-completion for Archange options
+- Add `--help` options with description of the script + options descriptions
+- Add pagination in `--show_history` options
 
 ## Get Started
 
@@ -71,11 +81,17 @@ Then follow instructions in your terminal
 
 ## Script options
 
+Show help of the script
+
+```bash
+$ ./archange.sh --help
+```
+
 Display debug mode
 
 ```bash
-$ ./archange.sh --debug
-$ ./archange.sh -d
+$ ./archange.sh -v
+$ ./archange.sh --verbose
 ```
 
 Only the filename in your history file instead of (size, date, etc...)
@@ -84,27 +100,23 @@ Only the filename in your history file instead of (size, date, etc...)
 $ ./archange.sh --no-details
 ```
 
-Show history saved if show-history=5 we display only the last 5 files backups
+Show history saved if history=5 we display only the last 5 files backups
 
 ```bash
-$ ./archange.sh --show-history
-$ ./archange.sh --show-history=5
+$ ./archange.sh -history
+$ ./archange.sh -history=5
 ```
 
 Show configuration data with your file
 
 ```bash
-$ ./archange.sh -c
-$ ./archange.sh --settings
 $ ./archange.sh --show-settings
 ```
 
 Setup configuration file
 
 ```bash
-$ ./archange.sh -s
 $ ./archange.sh --setup
-$ ./archange.sh --setup-settings
 ```
 
 Erase trace on the server
