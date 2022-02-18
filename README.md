@@ -10,6 +10,7 @@ Developped in Bash `v5.1.0`
 
 - [Comming Next](#comming-next)
 - [Get Started](#get-started)
+- [Create alias](#create-a-persistant-alias)
 - [How to use](#how-to-use)
 - [Script options](#script-options)
 - [Export configuration of DSM](#export-configuration-of-dsm)
@@ -20,7 +21,6 @@ Developped in Bash `v5.1.0`
 ## Comming next
 
 - Integrate Auto-completion for Archange options
-- Add `--help` options with description of the script + options descriptions
 - Add pagination in `--show_history` options
 
 ## Get Started
@@ -32,10 +32,10 @@ $ git clone https://github.com/LucasNoga/Archange.git
 $ cd archange
 ```
 
-Then create your configuration file **settings.conf**
+Then create your configuration file **settings.conf** base on the sample
 
 ```bash
-$ touch settings.conf
+$ cp settings.sample.conf settings.conf
 $ vim settings.conf
 ```
 
@@ -69,18 +69,43 @@ ARCHANGE_PATH="/server/dev" # get history files to the folder /server/dev
 FOLDER_HISTORY="./MyHistory" # Store files into the folder ./MyHistory
 ```
 
-## How to use
+## Create a persistant alias
 
 ```bash
-$ chmod +x archange.sh
-$ cp settings.sample.conf settings.conf
+vim ~/.bash_aliases
+```
+
+Then put this line
+
+```bash
+alias archange="<PATH_TO_REPO>/archange.sh"
+```
+
+Then in your `~/.bashrc` or `~/bash_profile` execute `bash_aliases` with this
+
+```bash
+if [ -f ~/.bash_aliases ]; then
+. ~/.bash_aliases
+fi
+```
+
+## How to use
+
+If you setup the alias
+
+```bash
+$ archange
+```
+
+if not
+
+```bash
 $ ./archange.sh
 ```
 
-Then follow instructions in your terminal
-
 ## Script options
 
+Here's are the options on purpose  
 Show help of the script
 
 ```bash

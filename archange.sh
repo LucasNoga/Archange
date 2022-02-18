@@ -17,12 +17,13 @@ PROJECT_VERSION=v1.5.0
 # Parameters to execute script
 typeset -A CONFIG=(
     [run]=true                                         # If run is to false we don't execute the script
+    [script_location]="."                              # Get absolute path to where is the script executed
     [settings_prefix]=$PROJECT_NAME                    # For settings.conf variable already used in the system ($USER, $PATH)
-    [settings_file]="./settings.conf"                  # Configuration file
+    [settings_file]="settings.conf"                    # Configuration file
     [server_file]="HISTORY.txt"                        # File created on the server to get history
     [folder_history]=""                                # Folder to store on the local machine the history
     [filename_history]=HISTORY-$(date +"%Y-%m-%d").txt # Name of the file which will get the copy (default HISTORY_date)
-    [default_folder_history]="./History"               # Default Folder to store if no define in settings.conf
+    [default_folder_history]="History"                 # Default Folder to store if no define in settings.conf
     [debug_color]=light_blue                           # Color to show log in debug mode
 )
 
@@ -54,8 +55,12 @@ function main {
     read_options $@ # Read script options like (--debug)
     log_debug "Launch Project $(log_color "${PROJECT_NAME} : ${PROJECT_VERSION}" "magenta")"
 
+    # Setup script location
+    set_settings "script_location" "$(get_script_location)"
+    log_debug "Folder where script localized: $(log_color "${CONFIG[script_location]}" "yellow")"
+
     # Read .conf file (default ./setting.conf)
-    read_settings ${CONFIG[settings_file]}
+    read_settings "${CONFIG[script_location]}" "${CONFIG[settings_file]}"
 
     # Launch specific script depend of options
     launch_script
@@ -67,7 +72,7 @@ function main {
 function launch_script {
     if [ ${OPTIONS[history]} == true ]; then
         log_debug "Showing history"
-        show_history ${CONFIG[folder_history]} ${OPTIONS[history_number]}
+        show_history "${CONFIG[folder_history]}" "${OPTIONS[history_number]}"
         return
     elif [ ${OPTIONS[help]} == true ]; then
         help
@@ -95,7 +100,14 @@ function launch_history {
         return
     fi
 
-    setup_folder_history ${CONFIG[folder_history]}
+    # If folder doens't define in file config we define it here
+    if [ -z "${CONFIG[folder_history]}" ]; then
+        folder_history="${CONFIG[script_location]}/${CONFIG[default_folder_history]}"
+        set_settings "folder_history" "$folder_history"
+        log "No folder history defined. Get default value: $(log_color "$folder_history" "yellow")"
+    fi
+
+    setup_folder_history "${CONFIG[folder_history]}"
 
     get_server_path_history
 
@@ -155,11 +167,11 @@ function show_history {
 ###
 function setup_folder_history {
     folder=$1
-    if [ -d $folder ]; then
-        log_debug "Folder $folder already exists. No need to create it."
+    if [ -d "$folder" ]; then
+        log_debug "Folder for history: $folder already exists. No need to create it."
     else
         log "Folder $(log_color "$folder" "yellow") doesn't exist.\nCreating..."
-        mkdir $folder
+        mkdir "$folder"
         log "Folder $(log_color "$folder" "green") Created"
     fi
 }
@@ -257,7 +269,7 @@ function copy_history_to_local {
     log "Copy the file from $(log_color "$server_path" yellow) to $(log_color "$local_path" yellow)"
 
     # Copy the file
-    sshpass -p ${SERVER[password]} scp -P ${SERVER[port]} ${SERVER[user]}@${SERVER[ip]}:${SERVER[path]}/${CONFIG[server_file]} $folder/${CONFIG[filename_history]}
+    sshpass -p ${SERVER[password]} scp -P ${SERVER[port]} "${SERVER[user]}@${SERVER[ip]}:${SERVER[path]}/${CONFIG[server_file]}" "$folder/${CONFIG[filename_history]}"
 
     ret=$?
 
@@ -345,10 +357,14 @@ function check_server_file_exists {
 
 ###
 # Setup variables from settings file
-# $1 = path to the settings file (default: ./setting.conf)
+# $1 = path to the settings file (default: ./)
+# $2 = name of the settings file (default: settings.conf)
 ###
 function read_settings {
-    settings_file=$1
+    path=$1
+    filename=$2
+    settings_file="$path/$filename"
+
     log_debug "Read configuration file: $settings_file"
 
     if [ ! -f "$settings_file" ]; then
@@ -359,18 +375,13 @@ function read_settings {
     fi
 
     # Load configuration file
-    . $settings_file
+    . "$settings_file"
     log_debug "Configuration file $settings_file loaded"
 
     # Load data to get access to remote machine
     read_settings_server $settings_file
 
-    # Load the other data
-    set_settings "folder_history" $(eval echo $FOLDER_HISTORY)
-    if [ -z ${CONFIG[folder_history]} ]; then
-        set_settings "folder_history" ${CONFIG[default_folder_history]}
-        log "No folder define get default value of folder: $(log_color "${CONFIG[default_folder_history]}" "yellow")"
-    fi
+    set_settings "folder_history" "$FOLDER_HISTORY"
 
     log_debug "Dump: $(declare -p CONFIG)"
     log_debug "Dump: $(declare -p SERVER)"
@@ -378,7 +389,7 @@ function read_settings {
 
 ###
 # Setup remote machine (user, password, ip, port) from configuration file
-# $1 = path to the config file (default: ./setting.conf)
+# $1 = path to the config file (default: <script_location_path>/settings.conf)
 ###
 function read_settings_server {
     settings_file=$1
@@ -411,7 +422,7 @@ function read_settings_server {
 
 ###
 # List settings in settings.conf file if they are defined
-# $1: path where the settings file is (default: "./settings.conf")
+# $1: path where the settings file is (default: "<script_location_path>/settings.conf")
 ###
 function show_settings {
     file=$1
@@ -433,7 +444,7 @@ function show_settings {
 
 ###
 # Setup the settings in command line for the user, if the file exists we erased it
-# $1: path where the settings file is (default: "./settings.conf")
+# $1: path where the settings file is (default: <script_location_path>/settings.conf")
 ###
 function setup_settings {
     file=$1
@@ -574,7 +585,7 @@ function check_inputs {
 
 ###
 # Write the file settings the settings in command line for the user, if the file exists we erased it
-# $1: [string] path where the settings file is (default: "./settings.conf")
+# $1: [string] path where the settings file is (default: "<script_location_path>/settings.conf")
 # $2: [array] data to insert into the setting like (ip, user of else)
 ###
 function write_settings_file {
@@ -793,6 +804,13 @@ function grep_group_content {
     regex=$2
     echo $(echo $data | grep -oP "$regex")
 }
+
+###
+# Get the location of the executed script
+function get_script_location {
+    echo $(dirname "$0")
+}
+###
 
 ################################################################### Logging functions ###################################################################
 
